@@ -50,10 +50,11 @@ fileLoad.addEventListener('change', (event) => {
 async function initOpenSCAD() {
     logToConsole('Downloading OpenSCAD WASM engine from CDN...');
     try {
-        const OpenSCADModule = await import('https://unpkg.com/@openscad/openscad-wasm@2024.1.25/dist/openscad.js');
+        // We now switch to jsDelivr CDN, which handles ES module dynamic imports beautifully
+        const OpenSCADModule = await import('https://cdn.jsdelivr.net/npm/@openscad/openscad-wasm@2024.1.25/dist/openscad.js');
         
         openSCADInstance = await OpenSCADModule.default({
-            locateFile: (path) => `https://unpkg.com/@openscad/openscad-wasm@2024.1.25/dist/${path}`,
+            locateFile: (path) => `https://cdn.jsdelivr.net/npm/@openscad/openscad-wasm@2024.1.25/dist/${path}`,
             print: (text) => logToConsole(`[OpenSCAD]: ${text}`),
             printErr: (text) => logToConsole(`[ERROR]: ${text}`)
         });
