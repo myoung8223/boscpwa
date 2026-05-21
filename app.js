@@ -79,35 +79,49 @@ btnPreview.addEventListener('click', async () => {
     const scriptCode = editor.value;
 
     try {
-        // 1. Write the text from our editor into the WASM virtual file system
-        openSCADInstance.FS.writeFile('input.scad', scriptCode);
+        // 1. Write the text using an absolute virtual root path '/'
+        openSCADInstance.FS.writeFile('/input.scad', scriptCode);
+        logToConsole('Code loaded into virtual memory.');
 
-        // 2. Execute OpenSCAD to compile into an STL in virtual memory
-        openSCADInstance.callMain(['input.scad', '-o', 'output.stl']);
+        // 2. Execute OpenSCAD using explicit absolute file paths.
+        // We add '--enable=manifold' which handles fast modern rendering calculations.
+        logToConsole('Compiling geometry via WASM...');
         
-        // 3. Verify if the file was created successfully
-        if (openSCADInstance.FS.analyzePath('output.stl').exists) {
-            logToConsole('SUCCESS: Mesh generated.');
+        openSCADInstance.callMain(['/input.scad', '--enable=manifold', '-o', '/output.stl']);
+        
+        // 3. Verify if the file was created successfully in the absolute path
+        if (openSCADInstance.FS.analyzePath('/output.stl').exists) {
+            logToConsole('SUCCESS: 3D Mesh computed.');
 
-            // 4. Read the raw binary data out of the WASM file system
-            const stlData = openSCADInstance.FS.readFile('output.stl');
+            // 4. Read the raw binary data out of the absolute virtual path
+            const stlData = openSCADInstance.FS.readFile('/output.stl');
 
-            // 5. Turn that raw data into a usable object browser URL
+            // 5. Clean up virtual memory immediately so the cache doesn't bloat
+            openSCADInstance.FS.unlink('/output.stl');
+
+            // 6. Turn that raw data into a usable object browser URL
             currentStlBlob = new Blob([stlData], { type: 'model/stl' });
             const blobUrl = URL.createObjectURL(currentStlBlob);
 
-            // 6. Feed the URL to our 3D viewer and hide placeholder text
+            // 7. Feed the URL to our 3D viewer and hide placeholder text
             viewer3d.src = blobUrl;
             placeholderText.style.display = 'none';
             
             logToConsole('3D View updated successfully.');
-            btnExport.disabled = false; // Enable export now that we have a solid mesh
+            btnExport.disabled = false;
         } else {
-            logToConsole('ERROR: output.stl was not created. Check syntax errors.');
+            logToConsole('ERROR: output.stl was not created. Check console logs above for design errors.');
         }
 
     } catch (error) {
         logToConsole(`Execution error: ${error.message}`);
+        console.error(error);
+    } finally {
+        // CRITICAL EMSCRIPTEN RESET: 
+        // Emscripten keeps an internal argument count pointer. We reset it to allow unlimited clicks.
+        if (openSCADInstance && openSCADInstance.stubForNextCallMain) {
+            openSCADInstance.stubForNextCallMain();
+        }
     }
 });
 
@@ -128,6 +142,16 @@ btnExport.addEventListener('click', () => {
     logToConsole('Exported openscad_model.stl successfully.');
 });
 
+
+// ---- SERVICE WORKER REGISTRATION ----
+
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js')
+            .then(reg => console.log('Service Worker registered successfully!', reg.scope))
+            .catch(err => console.log('Service Worker registration failed:', err));
+    });
+}
 
 // Start initializing the engine immediately when the page loads
 btnPreview.disabled = true;
