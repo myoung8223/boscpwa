@@ -124,12 +124,13 @@ btnPreview.addEventListener('click', async () => {
             const stlData = instance.FS.readFile('/output.stl');
 
             // 5. Convert raw bytes to browser object URL
-            // Updated line: Use standard application/sla so the loader identifies the format
             currentStlBlob = new Blob([stlData], { type: 'application/sla' });
             const blobUrl = URL.createObjectURL(currentStlBlob);
-
-            // 6. Direct the blob URL to the viewer container
-            viewer3d.src = blobUrl;
+            
+            // 6. PASS DATA TO OUR NEW THREE.JS INJECTION PIPELINE HANDLER
+            update3DModelViewer(blobUrl);
+            
+            // 7. Hide overlay placeholder notifications
             placeholderText.style.display = 'none';
             
             logToConsole('3D View updated successfully.');
