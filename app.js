@@ -124,7 +124,8 @@ btnPreview.addEventListener('click', async () => {
             const stlData = instance.FS.readFile('/output.stl');
 
             // 5. Convert raw bytes to browser object URL
-            currentStlBlob = new Blob([stlData], { type: 'model/stl' });
+            // Updated line: Use standard application/sla so the loader identifies the format
+            currentStlBlob = new Blob([stlData], { type: 'application/sla' });
             const blobUrl = URL.createObjectURL(currentStlBlob);
 
             // 6. Direct the blob URL to the viewer container
