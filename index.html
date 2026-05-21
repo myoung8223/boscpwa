@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minimal OpenSCAD PWA</title>
+    <style>
+        * { box-sizing: border-box; }
+        body, html { margin: 0; padding: 0; height: 100%; font-family: sans-serif; background: #222; color: #fff; overflow: hidden; }
+        
+        /* Two-column layout */
+        .app-container { display: flex; height: 100vh; width: 100vw; }
+        .left-panel { width: 50%; display: flex; flex-direction: column; border-right: 2px solid #444; }
+        .right-panel { width: 50%; display: flex; flex-direction: column; background: #333; position: relative; }
+        
+        /* Toolbar */
+        .toolbar { padding: 10px; background: #111; display: flex; gap: 10px; align-items: center; }
+        button { background: #007acc; color: white; border: none; padding: 8px 16px; font-weight: bold; cursor: pointer; border-radius: 4px; }
+        button:hover { background: #0062a3; }
+        .file-btn { background: #444; }
+        .file-btn:hover { background: #555; }
+        
+        /* Code Editor Textarea */
+        textarea { flex-grow: 1; background: #1e1e1e; color: #d4d4d4; font-family: 'Courier New', Courier, monospace; font-size: 16px; padding: 15px; border: none; resize: none; outline: none; line-height: 1.5; }
+        
+        /* Console Output Box */
+        .console-box { height: 150px; background: #000; border-top: 2px solid #444; font-family: monospace; font-size: 13px; color: #0f0; padding: 10px; overflow-y: auto; white-space: pre-wrap; }
+        
+        /* Temporary placeholder for the 3D viewer */
+        .viewer-placeholder { display: flex; justify-content: center; align-items: center; height: 100%; color: #888; text-align: center; font-size: 1.2rem; }
+    </style>
+</head>
+<body>
+
+    <div class="app-container">
+        <div class="left-panel">
+            <div class="toolbar">
+                <input type="file" id="file-load" style="display:none;" accept=".scad">
+                <button class="file-btn" onclick="document.getElementById('file-load').click()">Load .scad</button>
+                <button class="file-btn" id="btn-save">Save .scad</button>
+                <button id="btn-render" style="margin-left: auto; background: #28a745;">Render STL</button>
+            </div>
+            
+            <textarea id="editor" spellcheck="false">// Welcome to Minimal OpenSCAD PWA
+union() {
+    cube([15, 15, 15], center = true);
+    sphere(r = 10);
+}</textarea>
+            
+            <div class="console-box" id="console">System ready. Click 'Render STL' to compile...</div>
+        </div>
+
+        <div class="right-panel" id="viewport">
+            <div class="viewer-placeholder">
+                <div>
+                    3D Preview Window<br>
+                    <span style="font-size:0.9rem; color:#666;">(WASM engine setup coming next)</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
