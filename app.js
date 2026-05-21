@@ -77,17 +77,22 @@ btnPreview.addEventListener('click', async () => {
 
     logToConsole('--- Generating Preview ---');
     const scriptCode = editor.value;
+    
+    // Clean array to collect logs for parsing later
+    const errorLogs = [];
 
     try {
         logToConsole('Spawning fresh WASM runtime sandbox...');
         
-        // Spawn a brand new, completely clean runtime instance for this calculation
         const instance = await new Promise((resolve, reject) => {
             try {
                 const inst = openSCADFactory({
                     noInitialRun: true,
                     print: (text) => logToConsole(`[OpenSCAD]: ${text}`),
-                    printErr: (text) => logToConsole(`[ERROR]: ${text}`),
+                    printErr: (text) => {
+                        logToConsole(`[ERROR]: ${text}`);
+                        errorLogs.push(text); // Collect error lines safely
+                    },
                     onRuntimeInitialized: () => resolve(inst)
                 });
 
@@ -130,6 +135,20 @@ btnPreview.addEventListener('click', async () => {
             btnExport.disabled = false;
         } else {
             logToConsole('ERROR: output.stl was not created. Check error stack above.');
+            
+            // Look through collected logs to find a line number
+            let detectedErrorLine = null;
+            for (const logLine of errorLogs) {
+                const lineMatch = logLine.match(/line\s+(\d+)/i);
+                if (lineMatch) {
+                    detectedErrorLine = parseInt(lineMatch[1], 10);
+                    break; // Use the first syntax error location found
+                }
+            }
+
+            if (detectedErrorLine) {
+                highlightEditorLine(detectedErrorLine);
+            }
         }
 
     } catch (error) {
@@ -137,6 +156,37 @@ btnPreview.addEventListener('click', async () => {
         console.error(error);
     }
 });
+
+// Helper function to handle text calculations and highlight the line
+function highlightEditorLine(lineNumber) {
+    const text = editor.value;
+    const lines = text.split('\n');
+    
+    let targetLine = lineNumber;
+    
+    // COMPILER OFFSET ADJUSTMENT
+    // If the parser complains about a line that is just an end brace, 
+    // the missing semicolon is almost certainly on the line above it.
+    if (targetLine > 1 && lines[targetLine - 1].trim() === '}') {
+        targetLine--; 
+    }
+
+    // Safety fallback bounds check
+    if (targetLine > lines.length) targetLine = lines.length;
+
+    // Sum up character indexes to find the starting and ending string offsets
+    let startPos = 0;
+    for (let i = 0; i < targetLine - 1; i++) {
+        startPos += lines[i].length + 1; // +1 handles the original newline char (\n)
+    }
+    const endPos = startPos + lines[targetLine - 1].length;
+
+    // Pull focus to text box and visually highlight the text range
+    editor.focus();
+    editor.setSelectionRange(startPos, endPos);
+    
+    logToConsole(`👉 Highlighted suspected syntax break near Line ${targetLine}.`);
+}
 
 
 // ---- THE EXPORT TRIGGER (Save STL) ----
