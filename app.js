@@ -8,8 +8,8 @@ const btnExport = document.getElementById('btn-export');
 const viewer3d = document.getElementById('3d-viewer');
 const placeholderText = document.getElementById('placeholder-text');
 
-// OpenSCAD WASM Instance variable
-let openSCADInstance = null;
+// Store the FACTORY engine globally instead of a single-use instance
+let openSCADFactory = null;
 let currentStlBlob = null; // Stores the rendered STL for exporting
 
 // Helper to log to our UI console
@@ -45,37 +45,20 @@ fileLoad.addEventListener('change', (event) => {
 });
 
 
-// ---- OPENSCAD WASM INITIALIZATION ----
+// ---- OPENSCAD WASM FACTORY PREPARATION ----
 
 async function initOpenSCAD() {
     logToConsole('Loading browser-optimized OpenSCAD module...');
     try {
-        // Import the browser-verified WebAssembly port of OpenSCAD
         const OpenSCADModule = await import('https://code4fukui.github.io/scad2stl/openscad.js');
         
-        // Flexibly capture default exports, named exports, or direct module footprints
-        const openSCADFactory = OpenSCADModule.default || OpenSCADModule.createOpenSCAD || OpenSCADModule;
+        openSCADFactory = OpenSCADModule.default || OpenSCADModule.createOpenSCAD || OpenSCADModule;
         
         if (typeof openSCADFactory !== 'function') {
-            throw new Error(`OpenSCAD factory interface not found. Available exports: ${Object.keys(OpenSCADModule)}`);
+            throw new Error("OpenSCAD factory interface could not be resolved.");
         }
 
-        logToConsole('Downloading and compiling WASM binary engine...');
-        
-        // Instantiate the module framework. 
-        // Modern browser builds automatically resolve the companion .wasm file using import.meta.url
-        openSCADInstance = await openSCADFactory({
-            noInitialRun: true,
-            print: (text) => logToConsole(`[OpenSCAD]: ${text}`),
-            printErr: (text) => logToConsole(`[ERROR]: ${text}`)
-        });
-
-        // Verify the presence of the virtual filesystem layer
-        if (!openSCADInstance || !openSCADInstance.FS) {
-            throw new Error("WASM initialized but virtual filesystem (FS) layer is missing.");
-        }
-
-        logToConsole('OpenSCAD WASM Engine fully loaded with Virtual FS ready!');
+        logToConsole('OpenSCAD Engine ready! Alter code and click Preview freely.');
         btnPreview.disabled = false;
     } catch (err) {
         logToConsole(`Failed to initialize OpenSCAD: ${err.message}`);
@@ -87,8 +70,8 @@ async function initOpenSCAD() {
 // ---- THE PREVIEW TRIGGER (F5 Style) ----
 
 btnPreview.addEventListener('click', async () => {
-    if (!openSCADInstance || !openSCADInstance.FS) {
-        logToConsole('Error: OpenSCAD filesystem is unavailable or engine is not ready.');
+    if (!openSCADFactory) {
+        logToConsole('Error: OpenSCAD engine factory is not loaded yet.');
         return;
     }
 
@@ -96,46 +79,62 @@ btnPreview.addEventListener('click', async () => {
     const scriptCode = editor.value;
 
     try {
-        // 1. Write the text using an absolute virtual root path '/'
-        openSCADInstance.FS.writeFile('/input.scad', scriptCode);
+        logToConsole('Spawning fresh WASM runtime sandbox...');
+        
+        // Spawn a brand new, completely clean runtime instance for this calculation
+        const instance = await new Promise((resolve, reject) => {
+            try {
+                const inst = openSCADFactory({
+                    noInitialRun: true,
+                    print: (text) => logToConsole(`[OpenSCAD]: ${text}`),
+                    printErr: (text) => logToConsole(`[ERROR]: ${text}`),
+                    onRuntimeInitialized: () => resolve(inst)
+                });
+
+                if (inst && typeof inst.then === 'function') {
+                    inst.then(resolve).catch(reject);
+                }
+            } catch (initError) {
+                reject(initError);
+            }
+        });
+
+        if (!instance || !instance.FS) {
+            throw new Error("Failed to initialize virtual filesystem mapping on runtime spawn.");
+        }
+
+        // 1. Write the user's code into the fresh instance's virtual memory
+        instance.FS.writeFile('/input.scad', scriptCode);
         logToConsole('Code loaded into virtual memory.');
 
-        // 2. Execute OpenSCAD using explicit absolute file paths.
+        // 2. Execute OpenSCAD compilation
         logToConsole('Compiling geometry via WASM...');
-        openSCADInstance.callMain(['/input.scad', '-o', '/output.stl']);
+        instance.callMain(['/input.scad', '-o', '/output.stl']);
         
-        // 3. Verify if the file was created successfully in the absolute path
-        if (openSCADInstance.FS.analyzePath('/output.stl').exists) {
+        // 3. Verify output creation
+        if (instance.FS.analyzePath('/output.stl').exists) {
             logToConsole('SUCCESS: 3D Mesh computed.');
 
-            // 4. Read the raw binary data out of the absolute virtual path
-            const stlData = openSCADInstance.FS.readFile('/output.stl');
+            // 4. Read the raw binary STL data out of virtual memory
+            const stlData = instance.FS.readFile('/output.stl');
 
-            // 5. Clean up virtual memory immediately so the cache doesn't bloat
-            openSCADInstance.FS.unlink('/output.stl');
-
-            // 6. Turn that raw data into a usable object browser URL
+            // 5. Convert raw bytes to browser object URL
             currentStlBlob = new Blob([stlData], { type: 'model/stl' });
             const blobUrl = URL.createObjectURL(currentStlBlob);
 
-            // 7. Feed the URL to our 3D viewer and hide placeholder text
+            // 6. Direct the blob URL to the viewer container
             viewer3d.src = blobUrl;
             placeholderText.style.display = 'none';
             
             logToConsole('3D View updated successfully.');
             btnExport.disabled = false;
         } else {
-            logToConsole('ERROR: output.stl was not created. Check console logs above for design errors.');
+            logToConsole('ERROR: output.stl was not created. Check error stack above.');
         }
 
     } catch (error) {
-        logToConsole(`Execution error: ${error.message}`);
+        logToConsole(`Execution error: ${error.message || error}`);
         console.error(error);
-    } finally {
-        // Reset argument pointers for next clicks
-        if (openSCADInstance && openSCADInstance.stubForNextCallMain) {
-            openSCADInstance.stubForNextCallMain();
-        }
     }
 });
 
@@ -148,7 +147,6 @@ btnExport.addEventListener('click', () => {
         return;
     }
     
-    // Download the already generated blob
     const link = document.createElement('a');
     link.href = URL.createObjectURL(currentStlBlob);
     link.download = 'openscad_model.stl';
@@ -167,7 +165,7 @@ if ('serviceWorker' in navigator) {
     });
 }
 
-// Start initializing the engine immediately when the page loads
+// Start preparation workflows
 btnPreview.disabled = true;
 btnExport.disabled = true;
 initOpenSCAD();
