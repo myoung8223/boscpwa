@@ -2,13 +2,19 @@
 
 A lightweight, browser-optimized Progressive Web App (PWA) that compiles and renders OpenSCAD geometry entirely client-side using WebAssembly (WASM). Write, preview, and iterate on 3D models instantly without local desktop installations.
 
-## Features
+## Current Features
 
 - **True Client-Side Compilation:** Leverages a browser-optimized WASM engine to compile `.scad` geometry on the fly.
 - **Persistent Workspace Cache:** Automatically saves your active session to `localStorage` so your draft layout is securely restored upon reload.
 - **Smart Hardware Tabbing:** Pre-configured editor workspace leveraging clean tabbed indentations (`\t`) mapping flawlessly to native text editing layouts.
 - **Automatic Preview on Load:** Intelligently triggers a 3D preview render the exact millisecond a local `.scad` file is opened.
 - **Streamlined Diagnostic Console:** A real-time terminal UI stripped of misleading native engine `[ERROR]` flags and sandbox filesystem warnings, exposing pure compilation milestones and rendering benchmarks.
+
+## Improvements and Features to Add
+
+- [ ] **Improve 3D Lighting and Model Texturing:** Right now the lighting needs improvement and texturing the models would improve the preview.
+- [ ] **Adjustable Editor Font Size:** An adjustable, and persistant font size for the editor would be welcome.
+- [ ] **Adjustable Editor/Preview Port Framing:** An adjustable, and persistant editor/preview port framing is needed.
 
 ## Getting Started
 
