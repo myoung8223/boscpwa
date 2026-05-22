@@ -228,82 +228,71 @@ initOpenSCAD();
 
 // ---- THE THREE.JS STL WORKSPACE VIEWPORT ENGINE ----
 
+// ---- THE THREE.JS STL WORKSPACE VIEWPORT ENGINE ----
+
 let scene, camera, renderer, controls, currentMesh = null;
+let workspaceInitialized = false;
 
 function init3DWorkspace() {
+    if (workspaceInitialized) return; // Prevent double-booting
+    workspaceInitialized = true;
+
     const container = document.getElementById('3d-viewer');
     if (!container) return;
+
+    // MATH SAFEGUARD: Never allow a 0px dimension to touch the camera matrix
+    const w = container.clientWidth || 500;
+    const h = container.clientHeight || 500;
 
     // 1. Scene Setup
     scene = new THREE.Scene();
     scene.background = new THREE.Color(0x222222);
 
-    // 2. Camera Viewport Calculation
-    camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
-    camera.position.set(30, 30, 40);
+    // 2. Camera Viewport Calculation (Protected against Infinity)
+    camera = new THREE.PerspectiveCamera(45, w / h, 0.1, 10000);
+    camera.position.set(40, 40, 40);
 
     // 3. WebGL Canvas Core Renderer Mounting
     renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setSize(container.clientWidth, container.clientHeight);
-    renderer.shadowMap.enabled = true;
+    renderer.setSize(w, h);
+    renderer.setPixelRatio(window.devicePixelRatio); // Forces crisp rendering on high-res displays
     container.appendChild(renderer.domElement);
 
-    // Force an immediate layout pass calculation on startup
-    camera.aspect = container.clientWidth / container.clientHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(container.clientWidth, container.clientHeight);
-    
     // 4. Mouse Orbit Controls Integration
     controls = new THREE.OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
-    controls.dampingFactor = 0.05;
+    controls.dampingFactor = 0.1;
+    controls.target.set(0, 0, 0);
 
-    // 5. Dual Lighting Environment Setup
-    const ambientLight = new THREE.AmbientLight(0x666666);
+    // ---- SANITY CHECK: INJECT RAINBOW TEST GEOMETRY ----
+    const testGeometry = new THREE.BoxGeometry(10, 10, 10);
+    // MeshNormalMaterial is completely immune to lighting and always renders bright neon colors
+    const testMaterial = new THREE.MeshNormalMaterial({ wireframe: true }); 
+    const testBox = new THREE.Mesh(testGeometry, testMaterial);
+    scene.add(testBox);
+    console.log("[Sanity Check]: Rainbow wireframe box added to workspace.");
+    // ---------------------------------------------------
+
+    // 5. Lighting Environment Setup
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
     scene.add(ambientLight);
 
-    // ---- SANITY CHECK: INJECT RAW TEST GEOMETRY ----
-    const testGeometry = new THREE.BoxGeometry(10, 10, 10);
-    // Use MeshBasicMaterial - it ignores lighting and is always 100% visible
-    const testMaterial = new THREE.MeshBasicMaterial({ 
-        color: 0x00ff00, 
-        wireframe: true 
-    });
-    const testBox = new THREE.Mesh(testGeometry, testMaterial);
-    testBox.position.set(0, 0, 0);
-    scene.add(testBox);
-    console.log("[Sanity Check]: Core green wireframe box added to workspace frame.");
-    
     const dirLight1 = new THREE.DirectionalLight(0xffffff, 0.8);
-    dirLight1.position.set(1, 1, 1).normalize();
+    dirLight1.position.set(50, 50, 50);
     scene.add(dirLight1);
 
-    const dirLight2 = new THREE.DirectionalLight(0x555555, 0.5);
-    dirLight2.position.set(-1, -1, -1).normalize();
-    scene.add(dirLight2);
-
-    // 6. Window Resize Auto Tracker
-    window.addEventListener('resize', () => {
-        camera.aspect = container.clientWidth / container.clientHeight;
-        camera.updateProjectionMatrix();
-        renderer.setSize(container.clientWidth, container.clientHeight);
-    });
-
-    // Start looping rendering frame animations with live size-checks
+    // 6. Robust Animation Loop with Dynamic Resize Protection
     function animate() {
         requestAnimationFrame(animate);
         
-        // DYNAMIC BOUNDS CHECK: Force canvas size updates if container dimensions slip
-        const width = container.clientWidth;
-        const height = container.clientHeight;
+        const cw = container.clientWidth;
+        const ch = container.clientHeight;
         
-        if (renderer.domElement.width !== width || renderer.domElement.height !== height) {
-            if (width > 0 && height > 0) {
-                camera.aspect = width / height;
-                camera.updateProjectionMatrix();
-                renderer.setSize(width, height, false); // "false" blocks layout thrashing loops
-                console.log(`[Viewport Fixed]: Resized Three.js canvas dynamically to match layout bounds: ${width}x${height}`);
-            }
+        // Only update matrix if dimensions are valid and have actually changed
+        if (cw > 0 && ch > 0 && (renderer.domElement.width !== cw || renderer.domElement.height !== ch)) {
+            camera.aspect = cw / ch;
+            camera.updateProjectionMatrix();
+            renderer.setSize(cw, ch, false);
         }
 
         controls.update();
@@ -312,13 +301,10 @@ function init3DWorkspace() {
     animate();
 }
 
-// Global invocation hook to feed new Binary data layouts into our canvas space
+// Global invocation hook for OpenSCAD preview button
 function update3DModelViewer(blobUrl) {
-    if (!scene) {
-        init3DWorkspace(); // Lazily builds scene workspace environment frames on first render pass
-    }
+    if (!workspaceInitialized) init3DWorkspace(); 
 
-    // Clear old geometry out of GPU registers
     if (currentMesh) {
         scene.remove(currentMesh);
         currentMesh.geometry.dispose();
@@ -328,47 +314,30 @@ function update3DModelViewer(blobUrl) {
 
     const loader = new THREE.STLLoader();
     loader.load(blobUrl, (geometry) => {
-        // 1. Force recalculation of surface normals so light interacts with faces correctly
         geometry.computeVertexNormals();
         
-        // 2. High-contrast material styling so it stands out against dark backgrounds
-        const material = new THREE.MeshStandardMaterial({ 
-            color: 0x3b82f6,      // Vibrant blue mesh
-            roughness: 0.3,
-            metalness: 0.1,
-            roughnessMap: null    // Ensure no fallback bugs affect rendering
-        });
-        
+        const material = new THREE.MeshStandardMaterial({ color: 0x3b82f6, roughness: 0.3, metalness: 0.1 });
         currentMesh = new THREE.Mesh(geometry, material);
         
-        // 3. Compute accurate bounding boxes
         geometry.computeBoundingBox();
         geometry.computeBoundingSphere();
         
         const center = new THREE.Vector3();
         geometry.boundingBox.getCenter(center);
-        
-        // Offset the mesh position so its absolute physical core rests at world coordinates [0, 0, 0]
         currentMesh.position.set(-center.x, -center.y, -center.z);
 
         scene.add(currentMesh);
         
-        // 4. DIAGNOSTIC CAMERA FRAMING
         const radius = geometry.boundingSphere.radius;
-        
-        // Change the material to basic wireframe so it ignores all lighting issues
-        currentMesh.material = new THREE.MeshBasicMaterial({ color: 0x3b82f6, wireframe: true });
-        
-        // Force the camera wildly far away (200 units on all axes)
-        camera.position.set(200, 200, 200);
-        
-        // Explicitly lock the camera and controls onto the absolute center
+        const targetDistance = radius > 0 ? radius * 3.5 : 50; 
+
+        camera.position.set(targetDistance, targetDistance, targetDistance);
         controls.target.set(0, 0, 0);
         camera.lookAt(0, 0, 0);
-        
         controls.update();
-        console.log(`[Viewer]: Mesh rendered successfully. Bounding radius: ${radius}`);
-    }, undefined, (err) => {
-        console.error('[Viewer Error]: Failed to read raw STL bytes:', err);
-    });
+        
+    }, undefined, (err) => console.error('[Viewer Error]:', err));
 }
+
+// BOOT THE WORKSPACE IMMEDIATELY ON PAGE LOAD
+init3DWorkspace();
