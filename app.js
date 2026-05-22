@@ -225,28 +225,18 @@ async function initOpenSCAD() {
         
         logToConsole('Loading typography packages from local repository...');
         
-        // Array matching the exact filenames you uploaded to GitHub
         const fontFiles = [
-            'LiberationSans-Regular.ttf',
-            'LiberationSans-Bold.ttf',
-            'LiberationSans-Italic.ttf',
-            'LiberationSans-BoldItalic.ttf',
-            'LiberationMono-Regular.ttf',
-            'LiberationMono-Bold.ttf',
-            'LiberationMono-Italic.ttf',
-            'LiberationMono-BoldItalic.ttf',
-            'LiberationSerif-Regular.ttf',
-            'LiberationSerif-Bold.ttf',
-            'LiberationSerif-Italic.ttf',
-            'LiberationSerif-BoldItalic.ttf'
+            'LiberationSans-Regular.ttf', 'LiberationSans-Bold.ttf', 'LiberationSans-Italic.ttf', 'LiberationSans-BoldItalic.ttf',
+            'LiberationMono-Regular.ttf', 'LiberationMono-Bold.ttf', 'LiberationMono-Italic.ttf', 'LiberationMono-BoldItalic.ttf',
+            'LiberationSerif-Regular.ttf', 'LiberationSerif-Bold.ttf', 'LiberationSerif-Italic.ttf', 'LiberationSerif-BoldItalic.ttf'
         ];
 
-        // Ensure the virtual WebAssembly directory structure exists
+        // Ensure a clean virtual folder structure exists
         try {
             instance.FS.mkdir('/fonts');
-        } catch(e) { /* Directory already exists across warm reloads */ }
+        } catch(e) { /* Directory already exists */ }
 
-        // Loop over every font file, download it locally, and mount it to both directories
+        // Loop over every font file, download it, and write it to the /fonts virtual folder
         for (const fontName of fontFiles) {
             try {
                 const fontUrl = `./fonts/${fontName}`;
@@ -260,20 +250,22 @@ async function initOpenSCAD() {
                 const arrayBuffer = await response.arrayBuffer();
                 const fontData = new Uint8Array(arrayBuffer);
                 
-                // 1. Write to the root workspace folder for direct <filename.ttf> usage
-                instance.FS.writeFile(fontName, fontData);
+                // Write directly to our dedicated virtual font path
+                const virtualPath = `/fonts/${fontName}`;
+                instance.FS.writeFile(virtualPath, fontData);
                 
-                // 2. Write to the /fonts/ subfolder as a fallback shadow copy
-                instance.FS.writeFile(`/fonts/${fontName}`, fontData);
-                
-                // Register both versions with the fallback subsystem manager
+                // Track internally with the Emscripten/WASM custom font registry
                 if (instance.fonts && typeof instance.fonts.registerFont === 'function') {
-                    instance.fonts.registerFont(fontName);
-                    instance.fonts.registerFont(`/fonts/${fontName}`);
+                    instance.fonts.registerFont(virtualPath);
                 }
             } catch (fontErr) {
                 console.error(`Error processing font asset "${fontName}":`, fontErr);
             }
+        }
+        
+        // EXPLICIT SYSTEM FIX: Set the OpenSCAD environment variable inside WASM so it maps the font folder natively
+        if (instance.ENV) {
+            instance.ENV.OPENSCAD_FONTDIR = '/fonts';
         }
         
         logToConsole('✅ Symmetrical typography suite successfully registered!');
