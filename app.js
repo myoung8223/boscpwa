@@ -1,5 +1,5 @@
 // ---- BUILD VERSION CONTROLLER ----
-const BUILD_NUMBER = "10"; // <-- Increment this number whenever you commit!
+const BUILD_NUMBER = "11"; // <-- Increment this number whenever you commit!
 
 // Dom Elements
 const editor = document.getElementById('editor');
@@ -8,7 +8,7 @@ const btnSave = document.getElementById('btn-save');
 const fileLoad = document.getElementById('file-load');
 const btnPreview = document.getElementById('btn-preview');
 const btnExport = document.getElementById('btn-export');
-const viewer3d = document.getElementById('3d-viewer');
+const viewer3d = document.getElementById('viewer-3d');
 const placeholderText = document.getElementById('placeholder-text');
 
 // Store the FACTORY engine globally instead of a single-use instance
@@ -230,7 +230,7 @@ function init3DWorkspace() {
     if (workspaceInitialized) return; // Prevent double-booting
     workspaceInitialized = true;
 
-    const container = document.getElementById('3d-viewer');
+    const container = document.getElementById('viewer-3d');
     if (!container) return;
 
     // MATH SAFEGUARD: Never allow a 0px dimension to touch the camera matrix
