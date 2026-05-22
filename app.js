@@ -520,6 +520,7 @@ function init3DWorkspace() {
     compassAxes.rotation.x = -Math.PI / 2;
     compassScene.add(compassAxes);
 
+    /*
     // 5. Lighting Environment Setup
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
     scene.add(ambientLight);
@@ -527,7 +528,28 @@ function init3DWorkspace() {
     const dirLight1 = new THREE.DirectionalLight(0xffffff, 0.8);
     dirLight1.position.set(50, 50, 50);
     scene.add(dirLight1);
+    */
 
+    // ---- UPGRADED: THREE-POINT STUDIO LIGHTING SYSTEM ----
+    // 1. Low Ambient Light: Keeps shadows from being pitch black, but doesn't wash out details
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.25);
+    scene.add(ambientLight);
+
+    // 2. Primary Key Light: Strong white light hitting the model from the front-top-right
+    const keyLight = new THREE.DirectionalLight(0xffffff, 0.85);
+    keyLight.position.set(100, 150, 50);
+    scene.add(keyLight);
+
+    // 3. Secondary Fill Light: Softer, warmer light from the opposite side to soften harsh shadow edges
+    const fillLight = new THREE.DirectionalLight(0xeeeeff, 0.4);
+    fillLight.position.set(-100, 80, -50);
+    scene.add(fillLight);
+
+    // 4. Rim/Top Light: Placed straight above pointing down to crisp up top edges and embossing
+    const topLight = new THREE.DirectionalLight(0xffffff, 0.3);
+    topLight.position.set(0, 200, 0);
+    scene.add(topLight);
+    
     // 6. Robust Animation Loop with Live Layout Boundary Matching
     function animate() {
         requestAnimationFrame(animate);
