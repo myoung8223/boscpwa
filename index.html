@@ -16,7 +16,16 @@
         /* Two-column layout */
         .app-container { display: flex; height: 100vh; width: 100vw; }
         .left-panel { width: 50%; display: flex; flex-direction: column; border-right: 2px solid #444; }
-        .right-panel { width: 50%; display: flex; flex-direction: column; background: #222; position: relative; }
+
+        .right-panel { 
+            width: 50%; 
+            height: 100vh; /* THE FIX: Lock panel height to 100% of the viewport vertical height */
+            display: flex; 
+            flex-direction: column; 
+            background: #222; 
+            position: relative; 
+            overflow: hidden; /* Stops accidental scrollbar leaks */
+        }
         
         /* Toolbar */
         .toolbar { padding: 10px; background: #111; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
@@ -36,14 +45,15 @@
         #3d-viewer { 
             position: absolute;
             top: 0;
+            bottom: 0; /* Anchor tightly to the bottom boundary edge */
             left: 0;
+            right: 0;  /* Anchor tightly to the right boundary edge */
             width: 100%; 
             height: 100%; 
             display: block;
             background-color: #222222; 
             z-index: 1;
         }
-
         /* THE FIX: Force the inner WebGL canvas to actively match the container dimensions */
         #3d-viewer canvas {
             width: 100% !important;
