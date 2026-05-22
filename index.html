@@ -33,8 +33,27 @@
         .console-box { height: 150px; background: #000; border-top: 2px solid #444; font-family: monospace; font-size: 13px; color: #0f0; padding: 10px; overflow-y: auto; white-space: pre-wrap; }
         
         /* 2. TARGET VIEWPORT PANEL FRAMING */
-        #3d-viewer { width: 100%; height: 100%; display: block; background-color: #222222; }
-        .viewer-placeholder { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #888; text-align: center; pointer-events: none; z-index: 10; }
+        #3d-viewer { 
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%; 
+            height: 100%; 
+            display: block;
+            background-color: #222222; 
+            z-index: 1; /* Sits securely behind placeholder overlays */
+        }
+        
+        .viewer-placeholder { 
+            position: absolute; 
+            top: 50%; 
+            left: 50%; 
+            transform: translate(-50%, -50%); 
+            color: #888; 
+            text-align: center; 
+            pointer-events: none; 
+            z-index: 10; /* Ensures instructions float on top of the 3D surface */
+        }
     </style>
 </head>
 <body>
