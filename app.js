@@ -1,5 +1,5 @@
 // ---- BUILD VERSION CONTROLLER ----
-const BUILD_NUMBER = "12"; // <-- Increment this number whenever you commit!
+const BUILD_NUMBER = "13"; // <-- Increment this number whenever you commit!
 
 // Dom Elements
 const editor = document.getElementById('editor');
@@ -10,6 +10,7 @@ const btnPreview = document.getElementById('btn-preview');
 const btnExport = document.getElementById('btn-export');
 const viewer3d = document.getElementById('viewer-3d');
 const placeholderText = document.getElementById('placeholder-text');
+const btnWireframe = document.getElementById('btn-wireframe');
 
 // Store the FACTORY engine globally instead of a single-use instance
 let openSCADFactory = null;
@@ -52,6 +53,30 @@ fileLoad.addEventListener('change', (event) => {
     reader.readAsText(file);
 });
 
+// Toggle Wireframe Environment View
+btnWireframe.addEventListener('click', () => {
+    wireframeMode = !wireframeMode;
+    btnWireframe.textContent = `Wireframe: ${wireframeMode ? 'ON' : 'OFF'}`;
+    btnWireframe.style.background = wireframeMode ? '#007acc' : '#444';
+
+    // Live update the viewport mesh instantly if a model is currently rendered
+    if (currentMesh && currentMesh.material) {
+        currentMesh.material.wireframe = wireframeMode;
+    }
+});
+
+// Global Application Hotkey Command Mappings
+window.addEventListener('keydown', (event) => {
+    // Check for [Ctrl + Enter] command match execution
+    if (event.ctrlKey && event.key === 'Enter') {
+        event.preventDefault(); // Stop default paragraph breaks or form issues
+        
+        if (!btnPreview.disabled) {
+            logToConsole('⌨️ Hotkey Triggered: [Ctrl + Enter]');
+            btnPreview.click(); // Programmatically execute compiling sequence safely
+        }
+    }
+});
 
 // ---- OPENSCAD WASM FACTORY PREPARATION ----
 
@@ -243,6 +268,7 @@ if ('serviceWorker' in navigator) {
 
 let scene, camera, renderer, controls, currentMesh = null;
 let workspaceInitialized = false;
+let wireframeMode = false;
 
 function init3DWorkspace() {
     if (workspaceInitialized) return; // Prevent double-booting
@@ -376,7 +402,13 @@ function update3DModelViewer(blobUrl) {
     loader.load(blobUrl, (geometry) => {
         geometry.computeVertexNormals();
         
-        const material = new THREE.MeshStandardMaterial({ color: 0x3b82f6, roughness: 0.3, metalness: 0.1 });
+        const material = new THREE.MeshStandardMaterial({ 
+            color: 0x3b82f6, 
+            roughness: 0.3, 
+            metalness: 0.1,
+            wireframe: wireframeMode // Tracks toggle selection dynamically upon fresh renders!
+        });
+        
         currentMesh = new THREE.Mesh(geometry, material);
         
         geometry.computeBoundingBox();
