@@ -16,13 +16,16 @@ Basic OpenSCAD PWA is a lightweight, browser-optimized Progressive Web App (PWA)
 
 - [ ] **Improve 3D Lighting and Model Texturing:** Right now the lighting needs improvement and texturing the models would improve the preview.
 - [ ] **Adjustable Editor Font Size:** An adjustable, and persistant font size for the editor would be welcome.
+- [ ] **Address Editor Word Wrap:** Word wrap needs to be disabled or made to be a configurable setting.
+- [ ] **Add Optional Line Numbers:** Optional line numbers in the editor would be a welcome feature.
 - [ ] **Adjustable Editor/Preview Port Framing:** An adjustable, and persistant editor/preview port framing is needed.
 - [ ] **Link to OpenSCAD Cheat Sheet:** The ability to pop-up the super handy OpenSCAD cheat sheet would be a nice feature to add.
 - [ ] **Help Button:** Add a Help button for communicating basic use and app information.
-- [ ] **Adjustable Axes and Grid:** Additional controls for the axes and grid would be handy.
+- [ ] **Adjustable Axes and Grid:** Additional controls for the axes and grid would be handy, possibly even tick marks and numerical labels.
 - [ ] **Orthogonal Projection:** Add a button for toggling between perspective and orthogonal 3D projection.
 - [ ] **Camera Movement Improvements:** Improve the camera movement, perhaps with translation accelleration.
 - [ ] **Improve PWA Icon:** The icon is a little dark. It could use a snazzier icon.
+- [ ] **Improve Error Highlighting:** While there's basic error highlighting now, that should be refined further.
 
 ## Getting Started
 
