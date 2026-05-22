@@ -1,5 +1,5 @@
 // ---- BUILD VERSION CONTROLLER ----
-const BUILD_NUMBER = "13"; // <-- Increment this number whenever you commit!
+const BUILD_NUMBER = "14"; // <-- Increment this number whenever you commit!
 
 // Dom Elements
 const editor = document.getElementById('editor');
@@ -53,13 +53,20 @@ fileLoad.addEventListener('change', (event) => {
     reader.readAsText(file);
 });
 
-// Toggle Wireframe Environment View
+// Toggle between Solid and Wireframe viewing modes
 btnWireframe.addEventListener('click', () => {
-    wireframeMode = !wireframeMode;
-    btnWireframe.textContent = `Wireframe: ${wireframeMode ? 'ON' : 'OFF'}`;
-    btnWireframe.style.background = wireframeMode ? '#007acc' : '#444';
+    wireframeMode = !wireframeMode; // true = wireframe, false = solid
+    
+    // Update labels and colors based on active mode state
+    if (wireframeMode) {
+        btnWireframe.textContent = 'Wireframe';
+        btnWireframe.style.background = '#444';     // Dark gray when in wireframe mode
+    } else {
+        btnWireframe.textContent = 'Solid';
+        btnWireframe.style.background = '#007acc';  // High-visibility blue when in solid mode
+    }
 
-    // Live update the viewport mesh instantly if a model is currently rendered
+    // Live update the viewport mesh instantly if a model is currently on screen
     if (currentMesh && currentMesh.material) {
         currentMesh.material.wireframe = wireframeMode;
     }
@@ -442,3 +449,5 @@ initOpenSCAD();
 
 // 3. Boot 3D environment immediately so size caches correctly
 init3DWorkspace();
+
+btnWireframe.style.background = '#007acc'; // Vibrant active solid blue
