@@ -57,4 +57,7 @@ When the application boots up, the execution sequence initiates automatically:
 ## Credits & Contributions
 
 - **Mike Young** — Lead Architect & Creator.
+- **[Three.js (mrdoob)](https://github.com/mrdoob/three.js)** — Created by Ricardo Cabello (mrdoob), providing the high-performance WebGL 3D graphics pipeline, along with the essential `STLLoader` and `OrbitControls` companion modules.
+- **[OpenSCAD WASM](https://github.com/openscad/openscad-wasm)** — The official, sandboxed WebAssembly port translating functional CAD code into raw geometries entirely client-side.
+- **[scad2stl (Code for Fukui)](https://github.com/code4fukui/scad2stl)** — The precision runtime utility for handling script parsing and streaming compiled mesh translations safely out of the virtual WASM environment.
 - **Gemini (Flash, Thinking, & Pro)** — AI Engineering Assistant, Code Optimization, & Regex Architecture.
