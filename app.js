@@ -1,5 +1,5 @@
 // ---- BUILD VERSION CONTROLLER ----
-const BUILD_NUMBER = "30"; // <-- Increment this number whenever you commit!
+const BUILD_NUMBER = "31"; // <-- Increment this number whenever you commit!
 
 // Dom Elements
 const editor = document.getElementById('editor');
@@ -212,7 +212,8 @@ async function initOpenSCAD() {
 
     logToConsole('Loading browser-optimized OpenSCAD module...');
     try {
-        const OpenSCADModule = await import('https://code4fukui.github.io/scad2stl/openscad.js');
+        //const OpenSCADModule = await import('https://code4fukui.github.io/scad2stl/openscad.js');
+        const OpenSCADModule = await import('./libs/openscad.js');
         
         openSCADFactory = OpenSCADModule.default || OpenSCADModule.createOpenSCAD || OpenSCADModule;
         if (typeof openSCADFactory !== 'function') {
