@@ -42,7 +42,7 @@
         .console-box { height: 150px; background: #000; border-top: 2px solid #444; font-family: monospace; font-size: 13px; color: #0f0; padding: 10px; overflow-y: auto; white-space: pre-wrap; }
         
         /* 2. TARGET VIEWPORT PANEL FRAMING */
-        #3d-viewer { 
+        #viewer-3d { 
             position: absolute;
             top: 0;
             bottom: 0; /* Anchor tightly to the bottom boundary edge */
@@ -55,7 +55,7 @@
             z-index: 1;
         }
         /* THE FIX: Force the inner WebGL canvas to actively match the container dimensions */
-        #3d-viewer canvas {
+        #viewer-3d canvas {
             width: 100% !important;
             height: 100% !important;
             display: block;
@@ -102,7 +102,7 @@ union() {
                 <span style="font-size:0.9rem; color:#666;">Click 'Preview' to view geometry</span>
             </div>
             
-            <div id="3d-viewer"></div>
+            <div id="viewer-3d"></div>
         </div>
     </div>
 
