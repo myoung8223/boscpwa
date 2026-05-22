@@ -1,5 +1,5 @@
 // ---- BUILD VERSION CONTROLLER ----
-const BUILD_NUMBER = "21"; // <-- Increment this number whenever you commit!
+const BUILD_NUMBER = "22"; // <-- Increment this number whenever you commit!
 
 // Dom Elements
 const editor = document.getElementById('editor');
@@ -249,7 +249,8 @@ async function initOpenSCAD() {
         // Loop over every font file, download it locally, and mount it to the core engine
         for (const fontName of fontFiles) {
             try {
-                const fontUrl = `${window.location.origin}/fonts/${fontName}`;
+                // CHANGE: Swapped window.location.origin for a relative path dot (.)
+                const fontUrl = `./fonts/${fontName}`;
                 const response = await fetch(fontUrl);
                 
                 if (!response.ok) {
