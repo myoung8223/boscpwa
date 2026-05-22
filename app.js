@@ -1,5 +1,5 @@
 // ---- BUILD VERSION CONTROLLER ----
-const BUILD_NUMBER = "25"; // <-- Increment this number whenever you commit!
+const BUILD_NUMBER = "26"; // <-- Increment this number whenever you commit!
 
 // Dom Elements
 const editor = document.getElementById('editor');
@@ -231,12 +231,12 @@ async function initOpenSCAD() {
             'LiberationSerif-Regular.ttf', 'LiberationSerif-Bold.ttf', 'LiberationSerif-Italic.ttf', 'LiberationSerif-BoldItalic.ttf'
         ];
 
-        // Ensure a clean virtual folder structure exists
+        // Ensure the virtual WebAssembly directory structure exists
         try {
             instance.FS.mkdir('/fonts');
-        } catch(e) { /* Directory already exists */ }
+        } catch(e) { /* Already exists across warm reloads */ }
 
-        // Loop over every font file, download it, and write it to the /fonts virtual folder
+        // Loop over every font file, download it, and clone it across all possible virtual paths
         for (const fontName of fontFiles) {
             try {
                 const fontUrl = `./fonts/${fontName}`;
@@ -250,20 +250,23 @@ async function initOpenSCAD() {
                 const arrayBuffer = await response.arrayBuffer();
                 const fontData = new Uint8Array(arrayBuffer);
                 
-                // Write directly to our dedicated virtual font path
-                const virtualPath = `/fonts/${fontName}`;
-                instance.FS.writeFile(virtualPath, fontData);
+                // Print confirmation showing the files are downloading with full integrity
+                logToConsole(`✔ Loaded ${fontName} (${fontData.byteLength} bytes)`);
                 
-                // Track internally with the Emscripten/WASM custom font registry
+                // Write copies to BOTH the absolute root and the /fonts folder to ensure discovery
+                instance.FS.writeFile(`/${fontName}`, fontData);
+                instance.FS.writeFile(`/fonts/${fontName}`, fontData);
+                
+                // Register both layout paths with the fallback manager
                 if (instance.fonts && typeof instance.fonts.registerFont === 'function') {
-                    instance.fonts.registerFont(virtualPath);
+                    instance.fonts.registerFont(`/${fontName}`);
+                    instance.fonts.registerFont(`/fonts/${fontName}`);
                 }
             } catch (fontErr) {
                 console.error(`Error processing font asset "${fontName}":`, fontErr);
             }
         }
         
-        // EXPLICIT SYSTEM FIX: Set the OpenSCAD environment variable inside WASM so it maps the font folder natively
         if (instance.ENV) {
             instance.ENV.OPENSCAD_FONTDIR = '/fonts';
         }
