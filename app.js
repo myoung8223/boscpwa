@@ -1,5 +1,5 @@
 // ---- BUILD VERSION CONTROLLER ----
-const BUILD_NUMBER = "42"; // <-- Increment this number whenever you commit!
+const BUILD_NUMBER = "43"; // <-- Increment this number whenever you commit!
 
 // Dom Elements
 const editor = document.getElementById('editor');
@@ -46,25 +46,11 @@ function logToConsole(message) {
 
 // Helper to log to our UI console
 function logToConsole(message) {
-    // Create an array of the specific phrases we want to muzzle
-    const quietList = [
-        "Could not initialize localization",
-        "Fontconfig error",
-        "Geometries in cache",
-        "Geometry cache size",
-        "CGAL Polyhedrons",
-        "CGAL cache size",
-        "Top level object is a 3D object",
-        "Facets:"
-    ];
+    // Regex matches '[ERROR]: ' at the absolute start of a line, or anywhere inside the string
+    const cleanMessage = message.replace(/^\[ERROR\]:\s*/gm, '');
 
-    // If the message contains any of our quiet phrases, exit the function early
-    if (quietList.some(phrase => message.includes(phrase))) {
-        return; 
-    }
-
-    // Normal logging for everything else
-    consoleBox.textContent += `\n${message}`;
+    // Append the cleaned message to the console box
+    consoleBox.textContent += `\n${cleanMessage}`;
     consoleBox.scrollTop = consoleBox.scrollHeight; // Auto scroll to bottom
 }
 
