@@ -1,5 +1,5 @@
 // ---- BUILD VERSION CONTROLLER ----
-const BUILD_NUMBER = "7"; // <-- Increment this number whenever you commit!
+const BUILD_NUMBER = "8"; // <-- Increment this number whenever you commit!
 
 // Dom Elements
 const editor = document.getElementById('editor');
@@ -257,6 +257,7 @@ function init3DWorkspace() {
     controls.dampingFactor = 0.1;
     controls.target.set(0, 0, 0);
 
+    /*
     // ---- SANITY CHECK: INJECT RAINBOW TEST GEOMETRY ----
     const testGeometry = new THREE.BoxGeometry(10, 10, 10);
     // MeshNormalMaterial is completely immune to lighting and always renders bright neon colors
@@ -265,6 +266,7 @@ function init3DWorkspace() {
     scene.add(testBox);
     console.log("[Sanity Check]: Rainbow wireframe box added to workspace.");
     // ---------------------------------------------------
+    */
 
     // 5. Lighting Environment Setup
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
