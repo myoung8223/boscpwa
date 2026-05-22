@@ -1,5 +1,5 @@
 // ---- BUILD VERSION CONTROLLER ----
-const BUILD_NUMBER = "26"; // <-- Increment this number whenever you commit!
+const BUILD_NUMBER = "27"; // <-- Increment this number whenever you commit!
 
 // Dom Elements
 const editor = document.getElementById('editor');
@@ -34,6 +34,7 @@ let activeModelColor = parseInt(savedColorHexStr.replace('#', '0x'), 16);
 // Store the FACTORY engine globally instead of a single-use instance
 let openSCADFactory = null;
 let currentStlBlob = null; // Stores the rendered STL for exporting
+const fontCache = {}; // <-- NEW: Global backpack to hold downloaded font bytes
 
 // Helper to log to our UI console
 function logToConsole(message) {
@@ -211,17 +212,15 @@ async function initOpenSCAD() {
 
     logToConsole('Loading browser-optimized OpenSCAD module...');
     try {
-        // Import the main WASM wrapper module
         const OpenSCADModule = await import('https://code4fukui.github.io/scad2stl/openscad.js');
         
-        // Resolve factory interface
         openSCADFactory = OpenSCADModule.default || OpenSCADModule.createOpenSCAD || OpenSCADModule;
         if (typeof openSCADFactory !== 'function') {
             throw new Error("OpenSCAD factory interface could not be resolved.");
         }
 
-        // Initialize an instance of the factory to grab filesystem handles
-        const instance = await openSCADFactory();
+        // Initialize the factory to ensure it's cached in the browser
+        await openSCADFactory();
         
         logToConsole('Loading typography packages from local repository...');
         
@@ -231,12 +230,7 @@ async function initOpenSCAD() {
             'LiberationSerif-Regular.ttf', 'LiberationSerif-Bold.ttf', 'LiberationSerif-Italic.ttf', 'LiberationSerif-BoldItalic.ttf'
         ];
 
-        // Ensure the virtual WebAssembly directory structure exists
-        try {
-            instance.FS.mkdir('/fonts');
-        } catch(e) { /* Already exists across warm reloads */ }
-
-        // Loop over every font file, download it, and clone it across all possible virtual paths
+        // Download fonts and store the raw bytes directly into JS memory
         for (const fontName of fontFiles) {
             try {
                 const fontUrl = `./fonts/${fontName}`;
@@ -250,28 +244,16 @@ async function initOpenSCAD() {
                 const arrayBuffer = await response.arrayBuffer();
                 const fontData = new Uint8Array(arrayBuffer);
                 
-                // Print confirmation showing the files are downloading with full integrity
-                logToConsole(`✔ Loaded ${fontName} (${fontData.byteLength} bytes)`);
+                // STORE IN THE BACKPACK
+                fontCache[fontName] = fontData;
                 
-                // Write copies to BOTH the absolute root and the /fonts folder to ensure discovery
-                instance.FS.writeFile(`/${fontName}`, fontData);
-                instance.FS.writeFile(`/fonts/${fontName}`, fontData);
-                
-                // Register both layout paths with the fallback manager
-                if (instance.fonts && typeof instance.fonts.registerFont === 'function') {
-                    instance.fonts.registerFont(`/${fontName}`);
-                    instance.fonts.registerFont(`/fonts/${fontName}`);
-                }
+                logToConsole(`✔ Cached ${fontName} in memory (${fontData.byteLength} bytes)`);
             } catch (fontErr) {
                 console.error(`Error processing font asset "${fontName}":`, fontErr);
             }
         }
         
-        if (instance.ENV) {
-            instance.ENV.OPENSCAD_FONTDIR = '/fonts';
-        }
-        
-        logToConsole('✅ Symmetrical typography suite successfully registered!');
+        logToConsole('✅ Typography suite successfully cached in global memory!');
         logToConsole('OpenSCAD Engine ready! Alter code and click Preview freely.');
         btnPreview.disabled = false;
     } catch (err) {
@@ -283,6 +265,8 @@ async function initOpenSCAD() {
 
 // ---- THE PREVIEW TRIGGER (F5 Style) ----
 
+// ---- THE PREVIEW TRIGGER (F5 Style) ----
+
 btnPreview.addEventListener('click', async () => {
     if (!openSCADFactory) {
         logToConsole('Error: OpenSCAD engine factory is not loaded yet.');
@@ -291,8 +275,6 @@ btnPreview.addEventListener('click', async () => {
 
     logToConsole('--- Generating Preview ---');
     const scriptCode = editor.value;
-    
-    // Clean array to collect logs for parsing later
     const errorLogs = [];
 
     try {
@@ -305,7 +287,7 @@ btnPreview.addEventListener('click', async () => {
                     print: (text) => logToConsole(`[OpenSCAD]: ${text}`),
                     printErr: (text) => {
                         logToConsole(`[ERROR]: ${text}`);
-                        errorLogs.push(text); // Collect error lines safely
+                        errorLogs.push(text);
                     },
                     onRuntimeInitialized: () => resolve(inst)
                 });
@@ -321,6 +303,26 @@ btnPreview.addEventListener('click', async () => {
         if (!instance || !instance.FS) {
             throw new Error("Failed to initialize virtual filesystem mapping on runtime spawn.");
         }
+
+        // --- NEW: UNPACK THE FONTS INTO THE FRESH SANDBOX ---
+        try { instance.FS.mkdir('/fonts'); } catch(e) { /* ignore */ }
+        
+        for (const [fontName, fontData] of Object.entries(fontCache)) {
+            // Write to both paths for guaranteed discovery
+            instance.FS.writeFile(`/${fontName}`, fontData);
+            instance.FS.writeFile(`/fonts/${fontName}`, fontData);
+            
+            if (instance.fonts && typeof instance.fonts.registerFont === 'function') {
+                instance.fonts.registerFont(`/${fontName}`);
+                instance.fonts.registerFont(`/fonts/${fontName}`);
+            }
+        }
+        
+        if (instance.ENV) {
+            instance.ENV.OPENSCAD_FONTDIR = '/fonts';
+        }
+        logToConsole('Typography injected into fresh compilation sandbox.');
+        // ----------------------------------------------------
 
         // 1. Write the user's code into the fresh instance's virtual memory
         instance.FS.writeFile('/input.scad', scriptCode);
@@ -352,13 +354,12 @@ btnPreview.addEventListener('click', async () => {
         } else {
             logToConsole('ERROR: output.stl was not created. Check error stack above.');
             
-            // Look through collected logs to find a line number
             let detectedErrorLine = null;
             for (const logLine of errorLogs) {
                 const lineMatch = logLine.match(/line\s+(\d+)/i);
                 if (lineMatch) {
                     detectedErrorLine = parseInt(lineMatch[1], 10);
-                    break; // Use the first syntax error location found
+                    break;
                 }
             }
 
