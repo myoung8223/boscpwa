@@ -41,7 +41,14 @@
             height: 100%; 
             display: block;
             background-color: #222222; 
-            z-index: 1; /* Sits securely behind placeholder overlays */
+            z-index: 1;
+        }
+
+        /* THE FIX: Force the inner WebGL canvas to actively match the container dimensions */
+        #3d-viewer canvas {
+            width: 100% !important;
+            height: 100% !important;
+            display: block;
         }
         
         .viewer-placeholder { 
