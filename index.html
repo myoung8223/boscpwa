@@ -36,7 +36,22 @@
         .file-btn:hover { background: #555; }
         
         /* Code Editor Textarea */
-        textarea { flex-grow: 1; background: #1e1e1e; color: #d4d4d4; font-family: 'Courier New', Courier, monospace; font-size: 16px; padding: 15px; border: none; resize: none; outline: none; line-height: 1.5; }
+        textarea { 
+            flex-grow: 1; 
+            background: #1e1e1e; 
+            color: #d4d4d4; 
+            font-family: 'Courier New', Courier, monospace; 
+            font-size: 14px; 
+            padding: 15px; 
+            border: none; 
+            resize: none; 
+            outline: none; 
+            line-height: 1.5; 
+            
+            /* --- ADD THESE TWO LINES HERE --- */
+            tab-size: 4;
+            -moz-tab-size: 4; /* Compatibility for older Firefox versions */
+        }
         
         /* Console Output Box */
         .console-box { height: 150px; background: #000; border-top: 2px solid #444; font-family: monospace; font-size: 13px; color: #0f0; padding: 10px; overflow-y: auto; white-space: pre-wrap; }
