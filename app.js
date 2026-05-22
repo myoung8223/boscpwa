@@ -1,5 +1,5 @@
 // ---- BUILD VERSION CONTROLLER ----
-const BUILD_NUMBER = "18"; // <-- Increment this number whenever you commit!
+const BUILD_NUMBER = "19"; // <-- Increment this number whenever you commit!
 
 // Dom Elements
 const editor = document.getElementById('editor');
@@ -122,6 +122,75 @@ modelColorInput.addEventListener('input', (event) => {
     
     if (currentMesh && currentMesh.material) {
         currentMesh.material.color.setHex(activeModelColor);
+    }
+});
+
+// Smart Symmetrical Indentation Engine: Handles Tab, Shift+Tab, and Multi-line Blocks
+editor.addEventListener('keydown', (event) => {
+    if (event.key === 'Tab') {
+        event.preventDefault(); // Prevent browser from shifting focus to the console
+
+        const start = editor.selectionStart;
+        const end = editor.selectionEnd;
+        const value = editor.value;
+        const isShift = event.shiftKey; // Detects if Shift is held down
+
+        // CASE 1: No text highlighted (just a single flashing typing cursor)
+        if (start === end) {
+            if (!isShift) {
+                // Standard Tab: Insert a single true tab character
+                editor.value = value.substring(0, start) + "\t" + value.substring(end);
+                editor.selectionStart = editor.selectionEnd = start + 1;
+            } else {
+                // Shift + Tab (Single Line Outdent): Look backward to the start of the current line
+                const lineStartPos = value.lastIndexOf('\n', start - 1) + 1;
+                
+                if (value.startsWith('\t', lineStartPos)) {
+                    // Strip exactly 1 tab character from the beginning of the line
+                    editor.value = value.substring(0, lineStartPos) + value.substring(lineStartPos + 1);
+                    editor.selectionStart = editor.selectionEnd = Math.max(lineStartPos, start - 1);
+                } else if (value.substring(lineStartPos, lineStartPos + 4) === "    ") {
+                    // Legacy Support: Strip 4 spaces from the beginning of the line if they exist
+                    editor.value = value.substring(0, lineStartPos) + value.substring(lineStartPos + 4);
+                    editor.selectionStart = editor.selectionEnd = Math.max(lineStartPos, start - 4);
+                }
+            }
+        } 
+        // CASE 2: Multi-line / Block text is highlighted
+        else {
+            // Find the perfect structural line boundaries of the selected block
+            const selectStartLineStart = value.lastIndexOf('\n', start - 1) + 1;
+            const selectEndLineEnd = value.indexOf('\n', end);
+            const finalEndPos = selectEndLineEnd === -1 ? value.length : selectEndLineEnd;
+
+            const targetBlock = value.substring(selectStartLineStart, finalEndPos);
+            let modifiedBlock = "";
+            let charsChangedCount = 0;
+
+            if (!isShift) {
+                // ---- MULTI-LINE INDENT (Add tabs to all lines) ----
+                modifiedBlock = targetBlock.split('\n').map(line => '\t' + line).join('\n');
+                charsChangedCount = modifiedBlock.length - targetBlock.length;
+            } else {
+                // ---- MULTI-LINE OUTDENT (Remove tabs/spaces from all lines) ----
+                modifiedBlock = targetBlock.split('\n').map(line => {
+                    if (line.startsWith('\t')) {
+                        return line.substring(1); // Remove 1 tab character
+                    } else if (line.startsWith('    ')) {
+                        return line.substring(4); // Remove 4 legacy spaces
+                    }
+                    return line; // Leave unindented base code completely untouched
+                }).join('\n');
+                charsChangedCount = modifiedBlock.length - targetBlock.length;
+            }
+
+            // Splice the modified block back into the editor stream smoothly
+            editor.value = value.substring(0, selectStartLineStart) + modifiedBlock + value.substring(finalEndPos);
+
+            // Re-highlight the relative code block cleanly so the user can keep working with it
+            editor.selectionStart = selectStartLineStart;
+            editor.selectionEnd = finalEndPos + charsChangedCount;
+        }
     }
 });
 
