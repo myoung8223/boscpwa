@@ -1,5 +1,5 @@
 // ---- BUILD VERSION CONTROLLER ----
-const BUILD_NUMBER = "56"; // <-- Increment this number whenever you commit!
+const BUILD_NUMBER = "57"; // <-- Increment this number whenever you commit!
 
 // Dom Elements
 const editor = document.getElementById('editor');
@@ -63,6 +63,9 @@ if (consoleBox && toggleConsoleBtn) {
 const toggleLinesBtn = document.getElementById('btn-toggle-lines');
 const lineNumbersDiv = document.getElementById('line-numbers');
 
+// 🔄 GLOBAL BRIDGE: This lets any function lower down in app.js trigger a line recount!
+let triggerLineUpdate = null;
+
 if (editor && lineNumbersDiv && toggleLinesBtn) {
     
     // 1. Core Generator: Count lines in textarea and populate sidebar
@@ -71,6 +74,9 @@ if (editor && lineNumbersDiv && toggleLinesBtn) {
         const linesArray = Array.from({ length: linesCount }, (_, i) => i + 1);
         lineNumbersDiv.innerHTML = linesArray.join('<br>');
     };
+
+    // Expose the internal function to our global bridge variable
+    triggerLineUpdate = updateLineNumbers;
 
     // Synchronize numbers whenever typing, pasting, or loading files
     editor.addEventListener('input', updateLineNumbers);
@@ -339,6 +345,12 @@ async function initOpenSCAD() {
         logToConsole('Seeded editor workspace with default starter geometry.');
     }
 
+    // 🚀 UPDATE LINE NUMBERS INSTANTLY ON PAGE LOAD
+    // This executes right after the editor text value has been assigned above
+    if (typeof triggerLineUpdate === 'function') {
+        triggerLineUpdate();
+    }
+    
     logToConsole('Loading browser-optimized OpenSCAD module...');
     try {
         //const OpenSCADModule = await import('https://code4fukui.github.io/scad2stl/openscad.js');
