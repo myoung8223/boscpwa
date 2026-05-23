@@ -65,6 +65,10 @@
             /* --- ADD THESE TWO LINES HERE --- */
             tab-size: 4;
             -moz-tab-size: 4; /* Compatibility for older Firefox versions */
+
+            /* 🚫 NEW: KILL WORD WRAP AND FORCE HORIZONTAL SCROLLING */
+            white-space: pre;
+            overflow-x: auto;
         }
         
         /* Console Output Box */
@@ -210,6 +214,18 @@ union() {
                 <label style="font-size: 0.9rem; color: #aaa;">Project Name:</label>
                 <input type="text" id="project-name-input" placeholder="untitled" 
                     style="width: 100%; background: #2d2d2d; border: 1px solid #444; color: #fff; padding: 6px 10px; border-radius: 4px; font-size: 0.9rem; outline: none;">
+            </div>
+
+            <div class="settings-group">
+                <label style="font-size: 0.9rem; color: #aaa;">Editor Font Size:</label>
+                <select id="editor-font-size-select" style="background: #2d2d2d; border: 1px solid #444; color: #fff; padding: 6px 10px; border-radius: 4px; font-size: 0.9rem; outline: none; cursor: pointer;">
+                    <option value="12px">12px</option>
+                    <option value="14px">14px</option>
+                    <option value="16px">16px</option>
+                    <option value="18px">18px</option>
+                    <option value="20px">20px</option>
+                    <option value="22px">22px</option>
+                </select>
             </div>
             
             <div class="settings-group">
