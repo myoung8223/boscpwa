@@ -1,5 +1,5 @@
 // ---- BUILD VERSION CONTROLLER ----
-const BUILD_NUMBER = "57"; // <-- Increment this number whenever you commit!
+const BUILD_NUMBER = "58"; // <-- Increment this number whenever you commit!
 
 // Dom Elements
 const editor = document.getElementById('editor');
