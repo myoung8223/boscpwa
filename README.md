@@ -50,9 +50,13 @@ When the application boots up, the execution sequence initiates automatically:
    ```
 3. **Resource Provisioning:** Fetches and extracts required font configurations directly into the virtual memory system before unlocking the compiler controls.
 
-### File Operations
+### Basic Use
 
-- **Loading Files:** Click the file input interface to pull local `.scad` documents into the editor workspace. The system bypasses any extra button clicks by automatically firing a 3D scene compile immediately upon upload.
+- **Loading Files:** Click the Open button load `.scad` files into the editor workspace. The system bypasses any extra button clicks by automatically firing a 3D scene compile immediately upon upload.
+- **Saving Files:** Click the Save button to download the `.scad` code in the editor workspace.
+- **Model Display:** Click on the Solid/Wireframe button to toggle between solid and wireframe model rendering. Click on the Color button to select the color for the 3D model.
+- **Previewing:** Click the Preview button or press [Ctrl] + [Enter] to compile your .scad into a 3D model that will display on the right pane.
+- **Exporting to STL:** Click the Export STL button to download the generated STL file.
 
 ## Built With
 
