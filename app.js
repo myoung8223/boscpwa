@@ -790,36 +790,34 @@ function update3DModelViewer(blobUrl) {
         // ==========================================================================
         const material = new THREE.MeshStandardMaterial({ 
             color: activeModelColor, 
-            roughness: 0.65,     // Spreads out specular highlights for plastic finish
-            metalness: 0.20,     // Slightly reduced from 0.70 to look like engineering plastic instead of polished steel
+            roughness: 0.85,     // Spreads out specular highlights for plastic finish, was 0.65
+            metalness: 0.05,     // Slightly reduced from 0.70 to look like engineering plastic instead of polished steel, was 0.2
             wireframe: wireframeMode 
         });
 
         // Inject the custom GLSL code right into Three.js's standard shader program
         material.onBeforeCompile = (shader) => {
-            // High-frequency pseudo-random noise generator function
             const noiseGLSL = `
                 float hash(vec2 p) {
                     return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
                 }
                 float proceduralNoise(vec3 p) {
-                    // Sample 3D world coordinates to create unified structural grit
                     return hash(p.xy + p.z);
                 }
             `;
 
-            // Prepend the functions to the top of the fragment shader program
             shader.fragmentShader = noiseGLSL + shader.fragmentShader;
 
-            // Replace the final color output block with our grit blending
             shader.fragmentShader = shader.fragmentShader.replace(
                 `#include <opaque_fragment>`,
                 `
-                // 8.0 handles the scale/frequency of the grain. 0.04 scales the color contrast.
-                float noiseGrit = proceduralNoise(vViewPosition * 8.0) * 0.04;
+                // 🔄 TEXTURE TUNING KNOBS:
+                // 1. Scale Multiplier (4.0): Dropped from 8.0 to make the noise grains LARGER and more visible.
+                // 2. Contrast Multiplier (0.12): Bumped from 0.04 to make the shadows and highlights 3x DEEPER.
+                float noiseGrit = proceduralNoise(vViewPosition * 4.0) * 0.12;
                 
-                // Adjust light output slightly down and up based on the noise map
-                outgoingLight.rgb += vec3(noiseGrit - 0.02);
+                // Subtracting half of the contrast (0.06) keeps the overall model brightness perfectly balanced
+                outgoingLight.rgb += vec3(noiseGrit - 0.06);
                 
                 #include <opaque_fragment>
                 `
