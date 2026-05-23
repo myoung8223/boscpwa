@@ -1,5 +1,5 @@
 // ---- BUILD VERSION CONTROLLER ----
-const BUILD_NUMBER = "55"; // <-- Increment this number whenever you commit!
+const BUILD_NUMBER = "56"; // <-- Increment this number whenever you commit!
 
 // Dom Elements
 const editor = document.getElementById('editor');
@@ -54,6 +54,59 @@ if (consoleBox && toggleConsoleBtn) {
         if (isConsoleVisible && typeof logToConsole === 'function') {
             logToConsole("🖥️ Console tracking workspace restored.");
         }
+    });
+}
+
+// ==========================================================================
+// 🔣 LINE NUMBERS & PERSISTENT TOGGLE CONTROLLER
+// ==========================================================================
+const lineNumbersDiv = document.getElementById('line-numbers');
+const toggleLinesBtn = document.getElementById('btn-toggle-lines');
+
+if (editor && lineNumbersDiv && toggleLinesBtn) {
+    // 1. Core Generator: Count lines in textarea and populate sidebar
+    const updateLineNumbers = () => {
+        const linesCount = editor.value.split('\n').length;
+        const linesArray = Array.from({ length: linesCount }, (_, i) => i + 1);
+        lineNumbersDiv.innerHTML = linesArray.join('<br>');
+    };
+
+    // Synchronize numbers whenever typing, pasting, or loading files
+    editor.addEventListener('input', updateLineNumbers);
+
+    // 2. Scroll Synchronization: Lock sidebar position to editor text scroll
+    editor.addEventListener('scroll', () => {
+        lineNumbersDiv.scrollTop = editor.scrollTop;
+    });
+
+    // Run layout counting instantly on engine boot up
+    updateLineNumbers();
+
+    // 3. Persistent Visibility Toggle Management
+    let isLinesEnabled = localStorage.getItem('openscad_lines_visible') !== 'disabled';
+
+    const applyLinesLayout = (enabled) => {
+        if (enabled) {
+            lineNumbersDiv.style.display = 'block';
+            toggleLinesBtn.textContent = 'Enabled';
+            toggleLinesBtn.style.backgroundColor = '#28a745'; // Balanced UI Green
+            isLinesEnabled = true;
+            localStorage.setItem('openscad_lines_visible', 'enabled');
+        } else {
+            lineNumbersDiv.style.display = 'none';
+            toggleLinesBtn.textContent = 'Disabled';
+            toggleLinesBtn.style.backgroundColor = '#dc3545'; // Attention Red
+            isLinesEnabled = false;
+            localStorage.setItem('openscad_lines_visible', 'disabled');
+        }
+    };
+
+    // Initialize display layout choice immediately on reload
+    applyLinesLayout(isLinesEnabled);
+
+    // Click Listener: Flip line settings on click
+    toggleLinesBtn.addEventListener('click', () => {
+        applyLinesLayout(!isLinesEnabled);
     });
 }
 
