@@ -60,10 +60,11 @@ if (consoleBox && toggleConsoleBtn) {
 // ==========================================================================
 // 🔣 LINE NUMBERS & PERSISTENT TOGGLE CONTROLLER
 // ==========================================================================
-const lineNumbersDiv = document.getElementById('line-numbers');
 const toggleLinesBtn = document.getElementById('btn-toggle-lines');
+const lineNumbersDiv = document.getElementById('line-numbers');
 
 if (editor && lineNumbersDiv && toggleLinesBtn) {
+    
     // 1. Core Generator: Count lines in textarea and populate sidebar
     const updateLineNumbers = () => {
         const linesCount = editor.value.split('\n').length;
@@ -79,9 +80,6 @@ if (editor && lineNumbersDiv && toggleLinesBtn) {
         lineNumbersDiv.scrollTop = editor.scrollTop;
     });
 
-    // Run layout counting instantly on engine boot up
-    updateLineNumbers();
-
     // 3. Persistent Visibility Toggle Management
     let isLinesEnabled = localStorage.getItem('openscad_lines_visible') !== 'disabled';
 
@@ -92,6 +90,11 @@ if (editor && lineNumbersDiv && toggleLinesBtn) {
             toggleLinesBtn.style.backgroundColor = '#28a745'; // Balanced UI Green
             isLinesEnabled = true;
             localStorage.setItem('openscad_lines_visible', 'enabled');
+            
+            // 🔄 FORCE RECALCULATION: Populate text lines immediately when turning visible
+            updateLineNumbers();
+            // Sync up scroll layout in case user scrolled while it was hidden
+            lineNumbersDiv.scrollTop = editor.scrollTop;
         } else {
             lineNumbersDiv.style.display = 'none';
             toggleLinesBtn.textContent = 'Disabled';
@@ -101,10 +104,14 @@ if (editor && lineNumbersDiv && toggleLinesBtn) {
         }
     };
 
-    // Initialize display layout choice immediately on reload
+    // 🚀 INITIALIZE CODES ON PAGE BOOT UP:
+    // First, count lines for existing boilerplate template code
+    updateLineNumbers();
+    
+    // Second, apply layout preference immediately (handles hidden state if cached)
     applyLinesLayout(isLinesEnabled);
 
-    // Click Listener: Flip line settings on click
+    // Click Listener: Flip line settings on user interaction
     toggleLinesBtn.addEventListener('click', () => {
         applyLinesLayout(!isLinesEnabled);
     });
