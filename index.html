@@ -65,9 +65,34 @@
         .file-btn { background: #444; }
         .file-btn:hover { background: #555; }
         
-        /* Code Editor Textarea */
+        /* 🔣 NEW: Line number parent container wrapper */
+        .editor-wrapper {
+            flex-grow: 1;      /* Replaces the old textarea flex-grow to stretch down to the console */
+            display: flex;
+            background: #1e1e1e;
+            overflow: hidden;  /* Keeps things neat */
+            position: relative;
+        }
+
+        /* 🔣 NEW: The line number sidebar element track */
+        #line-numbers {
+            width: 55px;
+            background: #1a1a1a;
+            color: #5a5a5a;
+            text-align: right;
+            padding: 15px 8px 15px 0; /* Matches your textarea padding exactly */
+            font-family: 'Courier New', Courier, monospace; /* Matches textarea font */
+            font-size: 14px;           /* Matches textarea font-size */
+            line-height: 1.5;          /* Matches textarea line-height */
+            user-select: none;         /* Disables highlighting numbers while selecting code */
+            overflow: hidden;          /* Disables double scroll bars */
+            border-right: 1px solid #2d2d2d;
+        }
+        
+        /* 📐 MODIFIED: Cleaned up layout dependencies for textarea */
         textarea { 
             flex-grow: 1; 
+            height: 100%;             /* Fills the height of the .editor-wrapper parent container */
             background: #1e1e1e; 
             color: #d4d4d4; 
             font-family: 'Courier New', Courier, monospace; 
@@ -167,7 +192,8 @@
             justify-content: space-between;
             align-items: center;
         }
-    </style>
+</style>
+    
 </head>
 <body>
 
@@ -186,12 +212,10 @@
                 <button id="btn-export" style="background: #28a745;">Export STL</button>
             </div>
             
-            <textarea id="editor" spellcheck="false">// Welcome to boscpwa
-$fn = 40;
-union() {
-    cube([15, 15, 15], center = true);
-    sphere(r = 10);
-}</textarea>
+            <div class="editor-wrapper">
+                <div id="line-numbers">1</div>
+                <textarea id="editor" spellcheck="false"></textarea>
+            </div>
             
             <div class="console-box" id="console">Basic OpenSCAD PWA - By: Mike Young</div>
         </div>
@@ -247,6 +271,11 @@ union() {
                 <button id="btn-camera-reset" class="file-btn" style="width: 120px; background: #6c757d;">Reset View</button>
             </div>
 
+            <div class="settings-group">
+                <label style="font-size: 0.9rem; color: #aaa;">Line Numbers:</label>
+                <button id="btn-toggle-lines" class="file-btn" style="width: 120px; background: #28a745;">Enabled</button>
+            </div>
+            
             <div class="settings-group">
                 <label style="font-size: 0.9rem; color: #aaa;">Show Console:</label>
                 <button id="btn-toggle-console" class="file-btn" style="width: 120px; background: #28a745;">Visible</button>
