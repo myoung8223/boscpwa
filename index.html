@@ -23,7 +23,7 @@
     <script src="libs/STLLoader.js"></script>
     <script src="libs/OrbitControls.js"></script>
     
-    <style>
+<style>
         * { box-sizing: border-box; }
         body, html { margin: 0; padding: 0; height: 100%; font-family: sans-serif; background: #222; color: #fff; overflow: hidden; }
         
@@ -100,6 +100,67 @@
             pointer-events: none; 
             z-index: 10; /* Keeps it layered neatly on top */
         }
+
+        /* ==========================================================================
+           🛠️ NEW: SETTINGS OVERLAY LAYOUTS
+           ========================================================================== */
+        
+        /* The fullscreen dimmed background blur */
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: rgba(0, 0, 0, 0.55);
+            backdrop-filter: blur(4px); /* Premium UI glass effect */
+            -webkit-backdrop-filter: blur(4px);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000; /* Floating strictly on top of textareas/WebGL canvases */
+            transition: opacity 0.15s ease;
+        }
+
+        /* The modular settings card interface container */
+        .overlay-content {
+            background-color: #1e1e1e; /* Matches your editor background color palette */
+            border: 1px solid #333;
+            color: #ffffff;
+            padding: 24px;
+            border-radius: 6px;
+            width: 320px;
+            position: relative;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+        }
+
+        /* Utility visibility controller */
+        .hidden {
+            display: none !important;
+        }
+
+        /* Native-feeling floating 'X' shutdown button alignment */
+        .close-btn {
+            position: absolute;
+            top: 12px;
+            right: 16px;
+            background: none;
+            border: none;
+            color: #888;
+            font-size: 22px;
+            cursor: pointer;
+            padding: 0;
+            line-height: 1;
+        }
+        .close-btn:hover { color: #fff; }
+
+        /* Row organizer for individual options panels */
+        .settings-group {
+            margin: 16px 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
     </style>
 </head>
 <body>
@@ -110,10 +171,10 @@
                 <input type="file" id="file-load" style="display:none;" accept=".scad">
                 <button class="file-btn" onclick="document.getElementById('file-load').click()">Load</button>
                 <button class="file-btn" id="btn-save">Save</button>
-                <button id="btn-wireframe" class="file-btn">Solid</button>
+                
+                <button id="btn-settings" class="file-btn">⚙️ Settings</button>
 
                 <input type="color" id="model-color" value="#3b82f6" style="display: none;">
-                <button id="btn-color-trigger" class="file-btn" style="color: #ffffff; text-shadow: 0px 1px 2px rgba(0,0,0,0.6);">Color</button>
                 
                 <button id="btn-preview" style="margin-left: auto; background: #ffc107; color: #000;">Preview</button>
                 <button id="btn-export" style="background: #28a745;">Export STL</button>
@@ -136,6 +197,24 @@ union() {
             </div>
             
             <div id="viewer-3d"></div>
+        </div>
+    </div>
+
+    <div id="settings-overlay" class="overlay hidden">
+        <div class="overlay-content">
+            <button id="btn-close-settings" class="close-btn">&times;</button>
+            <h3 style="margin-top: 0; margin-bottom: 15px; font-size: 1.2rem;">Workspace Settings</h3>
+            <hr style="border: 0; border-top: 1px solid #333; margin-bottom: 20px;">
+            
+            <div class="settings-group">
+                <label style="font-size: 0.9rem; color: #aaa;">Mesh View:</label>
+                <button id="btn-wireframe" class="file-btn" style="width: 120px;">Solid</button>
+            </div>
+            
+            <div class="settings-group">
+                <label style="font-size: 0.9rem; color: #aaa;">Mesh Color:</label>
+                <button id="btn-color-trigger" class="file-btn" style="width: 120px; color: #ffffff; text-shadow: 0px 1px 2px rgba(0,0,0,0.6);">Color</button>
+            </div>
         </div>
     </div>
 
