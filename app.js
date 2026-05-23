@@ -1,58 +1,74 @@
-// ---- BUILD VERSION CONTROLLER ----
-const BUILD_NUMBER = "50"; // <-- Increment this number whenever you commit!
+// ==========================================================================
+// 🚀 BUILD CONTROLLER & GLOBAL APP CONFIG
+// ==========================================================================
+const BUILD_NUMBER = "51"; // <-- Increment this number whenever you commit!
 
-// Dom Elements
-const editor = document.getElementById('editor');
-const consoleBox = document.getElementById('console');
-const btnSave = document.getElementById('btn-save');
-const fileLoad = document.getElementById('file-load');
-const btnPreview = document.getElementById('btn-preview');
-const btnExport = document.getElementById('btn-export');
-const viewer3d = document.getElementById('viewer-3d');
-const btnCameraReset = document.getElementById('btn-camera-reset');
-const placeholderText = document.getElementById('placeholder-text');
-const btnWireframe = document.getElementById('btn-wireframe');
-const projectNameInput = document.getElementById('project-name-input');
-const editorFontSizeSelect = document.getElementById('editor-font-size-select');
-const modelColorInput = document.getElementById('model-color');
-const btnColorTrigger = document.getElementById('btn-color-trigger');
 
-// ---- PERSISTENT PROJECT NAME INITIALIZATION ----
+// ==========================================================================
+// 📥 UNIFIED DOM ELEMENT REGISTER
+// ==========================================================================
+
+// Core Workspace Blocks
+const editor                 = document.getElementById('editor');
+const consoleBox             = document.getElementById('console');
+const viewer3d               = document.getElementById('viewer-3d');
+const placeholderText        = document.getElementById('placeholder-text');
+
+// Primary App Actions Toolbar
+const fileLoad               = document.getElementById('file-load');
+const btnSave                = document.getElementById('btn-save');
+const btnPreview             = document.getElementById('btn-preview');
+const btnExport              = document.getElementById('btn-export');
+
+// Overlay Settings Menu Components
+const btnCameraReset         = document.getElementById('btn-camera-reset');
+const btnWireframe           = document.getElementById('btn-wireframe');
+const projectNameInput       = document.getElementById('project-name-input');
+const editorFontSizeSelect   = document.getElementById('editor-font-size-select');
+const modelColorInput        = document.getElementById('model-color');
+const btnColorTrigger        = document.getElementById('btn-color-trigger');
+
+
+// ==========================================================================
+// 🌐 GLOBAL ENGINE VARIABLES & STORAGE
+// ==========================================================================
+let openSCADFactory = null;
+let currentStlBlob = null; 
+const fontCache = {}; 
+let wireframeMode = false; // Tracks view state
+
+
+// ==========================================================================
+// 💾 PERSISTENT APPLICATIONS STATE INITIALIZATION
+// ==========================================================================
+
+// 1. Project Naming Pipeline & Title Synchronization
 let activeProjectName = localStorage.getItem('openscad_project_name') || 'untitled';
-
-if (projectNameInput) {
-    projectNameInput.value = activeProjectName;
-}
+if (projectNameInput) projectNameInput.value = activeProjectName;
 
 function updateWindowTitle() {
     document.title = `${activeProjectName}.scad`;
 }
-updateWindowTitle();
+updateWindowTitle(); 
 
-// ---- PERSISTENT FONT SIZE INITIALIZATION ----
+// 2. Text Editor Font Scale Engine
 const savedFontSizeStr = localStorage.getItem('openscad_editor_font_size') || '14px';
-
 if (editor && editorFontSizeSelect) {
     editor.style.fontSize = savedFontSizeStr;
     editorFontSizeSelect.value = savedFontSizeStr;
 }
 
-// ---- PERSISTENT COLOR PREFERENCE INITIALIZATION ----
+// 3. WebGL Mesh Color Settings
 const savedColorHexStr = localStorage.getItem('openscad_model_color') || '#3b82f6';
-
-if (modelColorInput) {
-    modelColorInput.value = savedColorHexStr;
-}
-if (btnColorTrigger) {
-    btnColorTrigger.style.background = savedColorHexStr;
-}
+if (modelColorInput) modelColorInput.value = savedColorHexStr;
+if (btnColorTrigger) btnColorTrigger.style.background = savedColorHexStr;
 
 let activeModelColor = parseInt(savedColorHexStr.replace('#', '0x'), 16);
 
-// Store the FACTORY engine globally instead of a single-use instance
-let openSCADFactory = null;
-let currentStlBlob = null; 
-const fontCache = {}; 
+
+// ==========================================================================
+// 🛠️ INTERNAL SYSTEM UTILITIES
+// ==========================================================================
 
 // Helper to log to our UI console
 function logToConsole(message) {
@@ -67,7 +83,10 @@ function logToConsole(message) {
     consoleBox.scrollTop = consoleBox.scrollHeight; 
 }
 
-// ---- FILE OPERATIONS (.scad) ----
+
+// ==========================================================================
+// 📁 NATIVE OS FILE OPERATIONS (.scad)
+// ==========================================================================
 
 // Save local .scad file
 btnSave.addEventListener('click', () => {
@@ -115,6 +134,40 @@ fileLoad.addEventListener('change', (event) => {
     reader.readAsText(file);
 });
 
+
+// ==========================================================================
+// ⚙️ UI & SETTINGS CONTROLLERS
+// ==========================================================================
+
+// 🟢 FIX: Live Editor Text Scaling Change Listener
+if (editorFontSizeSelect) {
+    editorFontSizeSelect.addEventListener('change', (event) => {
+        const selectedSize = event.target.value;
+        localStorage.setItem('openscad_editor_font_size', selectedSize);
+        if (editor) editor.style.fontSize = selectedSize;
+        logToConsole(`🔎 Editor text scaled to: ${selectedSize}`);
+    });
+}
+
+// 🟢 FIX: Live Project Name Update Listener
+if (projectNameInput) {
+    projectNameInput.addEventListener('input', (event) => {
+        let cleanedName = event.target.value.replace(/[/\\?%*:|"<>. ]/g, '_');
+        activeProjectName = cleanedName || 'untitled';
+        localStorage.setItem('openscad_project_name', activeProjectName);
+        updateWindowTitle();
+    });
+    
+    projectNameInput.addEventListener('blur', (event) => {
+        if (!event.target.value.trim()) {
+            event.target.value = 'untitled';
+            activeProjectName = 'untitled';
+            localStorage.setItem('openscad_project_name', 'untitled');
+            updateWindowTitle();
+        }
+    });
+}
+
 // Toggle between Solid and Wireframe viewing modes
 btnWireframe.addEventListener('click', () => {
     wireframeMode = !wireframeMode; 
@@ -129,18 +182,6 @@ btnWireframe.addEventListener('click', () => {
 
     if (currentMesh && currentMesh.material) {
         currentMesh.material.wireframe = wireframeMode;
-    }
-});
-
-// Global Application Hotkey Command Mappings
-window.addEventListener('keydown', (event) => {
-    if (event.ctrlKey && event.key === 'Enter') {
-        event.preventDefault(); 
-        
-        if (!btnPreview.disabled) {
-            logToConsole('⌨️ Hotkey Triggered: [Ctrl + Enter]');
-            btnPreview.click(); 
-        }
     }
 });
 
@@ -159,6 +200,23 @@ modelColorInput.addEventListener('input', (event) => {
     
     if (currentMesh && currentMesh.material) {
         currentMesh.material.color.setHex(activeModelColor);
+    }
+});
+
+
+// ==========================================================================
+// ⌨️ WORKSPACE HOTKEYS & TEXT INPUT ENGINES
+// ==========================================================================
+
+// Global Application Hotkey Command Mappings
+window.addEventListener('keydown', (event) => {
+    if (event.ctrlKey && event.key === 'Enter') {
+        event.preventDefault(); 
+        
+        if (!btnPreview.disabled) {
+            logToConsole('⌨️ Hotkey Triggered: [Ctrl + Enter]');
+            btnPreview.click(); 
+        }
     }
 });
 
