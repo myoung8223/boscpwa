@@ -33,22 +33,26 @@ const jar = CodeJar(editorElement, (el) => {
 
 // 🍯 INITIALIZE CODEJAR INSTANCE
 // Connects the text listener module to global Prism syntax coloring and matches brackets
-const jar = CodeJar(editorElement, (el) => {
-    // 1. Run Prism to color the keywords first
-    if (typeof Prism !== 'undefined') {
-        Prism.highlightElement(el);
-    }
-    
-    // 2. Safely run our native text cursor bracket matching pass
-    try {
-        applyInlineBracketMatching(el);
-    } catch (e) {
-        console.error("Bracket matching engine error:", e);
-    }
-});
+const jar = CodeJar(
+    editorElement, 
+    (el) => {
+        // 1. Run Prism to color the keywords first
+        if (typeof Prism !== 'undefined') {
+            Prism.highlightElement(el);
+        }
+        
+        // 2. Safely run our upgraded native text cursor bracket matching pass
+        try {
+            applyInlineBracketMatching(el);
+        } catch (e) {
+            console.error("Bracket matching engine error:", e);
+        }
+    },
+    { tab: '\t' } // 🛑 FIX ISSUE 1: Passing just tab options turns off CodeJar's default bracket autocomplete!
+);
 
 // ==========================================================================
-// 💡 NATIVE CODEJAR BRACKET MATCHING ENGINE
+// 💡 UPGRADED: BI-DIRECTIONAL CODEJAR BRACKET MATCHING ENGINE (FIX ISSUE 2)
 // ==========================================================================
 function applyInlineBracketMatching(editorDiv) {
     // Clear any previous bracket highlights from the last keystroke
@@ -57,14 +61,13 @@ function applyInlineBracketMatching(editorDiv) {
         span.classList.remove('bracket-match-glow', 'bracket-mismatch-glow');
     });
 
-    // Capture the current cursor position index from the browser selection engine
     const selection = window.getSelection();
     if (!selection.rangeCount) return;
     
     const range = selection.getRangeAt(0);
     const textContent = editorDiv.textContent;
     
-    // Calculate exactly how many characters deep the cursor is within the editor text matrix
+    // Calculate character index deep within the text stream
     let cursorIndex = 0;
     const treeWalker = document.createTreeWalker(editorDiv, NodeFilter.SHOW_TEXT);
     let currentNode = treeWalker.nextNode();
@@ -78,19 +81,18 @@ function applyInlineBracketMatching(editorDiv) {
         currentNode = treeWalker.nextNode();
     }
 
-    // Maps for open and closing partners
     const partners = { '{': '}', '}': '{', '[': ']', ']': '[', '(': ')', ')': '(' };
     
-    // Check the character immediately to the left of the cursor, or to the right
-    let targetIndex = cursorIndex - 1;
+    // 🧠 BI-DIRECTIONAL CHECK: Look right next to the cursor, then look slightly left
+    let targetIndex = cursorIndex;
     let charToMatch = textContent[targetIndex];
     
     if (!partners[charToMatch]) {
-        targetIndex = cursorIndex;
+        targetIndex = cursorIndex - 1;
         charToMatch = textContent[targetIndex];
     }
     
-    // If the character isn't a bracket type, abort immediately
+    // If neither side holds a valid structural bracket, step out smoothly
     if (!partners[charToMatch]) return;
     
     const partnerChar = partners[charToMatch];
@@ -99,7 +101,7 @@ function applyInlineBracketMatching(editorDiv) {
     let matchIndex = -1;
     let balanceCounter = 0;
 
-    // Scan through the code array structure to locate the perfect partner balance tree
+    // Scan the string vector for the balancing structural partner
     if (isForwardScan) {
         for (let i = targetIndex; i < textContent.length; i++) {
             if (textContent[i] === charToMatch) balanceCounter++;
@@ -120,7 +122,7 @@ function applyInlineBracketMatching(editorDiv) {
         }
     }
 
-    // Now, find the actual underlying text nodes inside the browser's view DOM to paint
+    // Identify and link onto the precise target elements inside the UI view tree
     let absoluteOffset = 0;
     let targetSpanNode = null;
     let matchSpanNode = null;
@@ -131,11 +133,9 @@ function applyInlineBracketMatching(editorDiv) {
     while (textNode) {
         const nodeLength = textNode.textContent.length;
         
-        // Did we hit the anchor target bracket node?
         if (targetIndex >= absoluteOffset && targetIndex < absoluteOffset + nodeLength) {
             targetSpanNode = textNode.parentNode;
         }
-        // Did we hit its remote partner node?
         if (matchIndex !== -1 && matchIndex >= absoluteOffset && matchIndex < absoluteOffset + nodeLength) {
             matchSpanNode = textNode.parentNode;
         }
@@ -144,13 +144,13 @@ function applyInlineBracketMatching(editorDiv) {
         textNode = walker.nextNode();
     }
 
-    // Paint the nodes depending on whether a true match was successfully calculated
+    // Paint the elements using the application CSS layers
     if (targetSpanNode) {
         if (matchIndex !== -1 && matchSpanNode) {
             targetSpanNode.classList.add('bracket-match-glow');
             matchSpanNode.classList.add('bracket-match-glow');
         } else {
-            targetSpanNode.classList.add('bracket-mismatch-glow'); // Rogue orphaned bracket alert
+            targetSpanNode.classList.add('bracket-mismatch-glow');
         }
     }
 }
