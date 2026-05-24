@@ -588,6 +588,10 @@ let workspaceInitialized = false;
 let gridHelper = null;
 let axesGroup = null;
 
+// 🔒 PERSISTENT GRID & AXES VISIBILITY TRACKERS (Initialized first!)
+let isGridVisible = localStorage.getItem('openscad_grid_visible') !== 'false';
+let isAxesVisible = localStorage.getItem('openscad_axes_visible') !== 'false';
+
 let openSCADFactory = null;
 let currentStlBlob = null; 
 const fontCache = {}; 
@@ -1236,11 +1240,7 @@ window.addEventListener('keydown', (event) => {
 // ⚙️ PERSISTENT GRID & AXES VISIBILITY LOGIC
 // ==========================================================================
 
-// 1. Load persistent states (default to true if no save exists)
-let isGridVisible = localStorage.getItem('openscad_grid_visible') !== 'false';
-let isAxesVisible = localStorage.getItem('openscad_axes_visible') !== 'false';
-
-// 2. State Controller Functions
+// 1. State Controller Functions
 const applyGridLayout = (visible) => {
     isGridVisible = visible;
     localStorage.setItem('openscad_grid_visible', visible);
@@ -1265,11 +1265,11 @@ const applyAxesLayout = (visible) => {
     }
 };
 
-// 3. Apply states to UI on load
+// 2. Apply states to UI on load (Reads from global trackers initialized at the top)
 applyGridLayout(isGridVisible);
 applyAxesLayout(isAxesVisible);
 
-// 4. Hook up the UI buttons
+// 3. Hook up the UI buttons
 if (btnToggleGrid) {
     btnToggleGrid.addEventListener('click', () => applyGridLayout(!isGridVisible));
 }
