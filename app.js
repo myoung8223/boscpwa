@@ -1,5 +1,5 @@
 // ---- BUILD VERSION CONTROLLER ----
-const BUILD_NUMBER = "72"; // <-- Incremented for Compiler Error Line Highlighting Engine
+const BUILD_NUMBER = "73"; // <-- Incremented for Compiler Error Line Highlighting Engine
 
 // 🍯 Import standalone, offline-ready CodeJar framework
 import { CodeJar } from './libs/codejar.min.js';
@@ -971,6 +971,7 @@ function init3DWorkspace() {
     compassRenderer.setPixelRatio(window.devicePixelRatio);
     compassContainer.appendChild(compassRenderer.domElement);
 
+    /*
     const compassAxes = new THREE.AxesHelper(18);   // was 25, was 20
     compassAxes.rotation.x = -Math.PI / 2;
     compassScene.add(compassAxes);
@@ -986,6 +987,35 @@ function init3DWorkspace() {
     xLabel.position.set(mid, 0, 0);
     yLabel.position.set(0, mid, 0);
     zLabel.position.set(0, 0, mid);
+    */
+
+    const compassAxes = new THREE.AxesHelper(25);
+    compassAxes.rotation.x = -Math.PI / 2;
+    compassScene.add(compassAxes);
+
+    // 🏷️ Create 2D HTML overlay labels for uniform sizing
+    const create2DLabel = (text, color) => {
+        const el = document.createElement('div');
+        el.innerText = text;
+        el.style.position = 'absolute';
+        el.style.color = color;
+        el.style.fontFamily = 'Arial, sans-serif';
+        el.style.fontWeight = 'bold';
+        el.style.fontSize = '12px'; // Completely uniform pixel size
+        el.style.pointerEvents = 'none';
+        el.style.transform = 'translate(-50%, -50%)'; // Center text exactly on the line tip
+        compassContainer.appendChild(el);
+        return el;
+    };
+
+    const xLabel2D = create2DLabel('X', '#ff0000');
+    const yLabel2D = create2DLabel('Y', '#00ff00');
+    const zLabel2D = create2DLabel('Z', '#0000ff');
+
+    // Define the local 3D endpoints of your 25-unit axes lines
+    const endpointX = new THREE.Vector3(25, 0, 0);
+    const endpointY = new THREE.Vector3(0, 25, 0);
+    const endpointZ = new THREE.Vector3(0, 0, 25);
 
     // Attach directly to compassAxes so they inherit the OpenSCAD Z-Up rotation!
     compassAxes.add(xLabel);
@@ -1022,10 +1052,10 @@ function init3DWorkspace() {
             camera.updateProjectionMatrix();
             renderer.setSize(cw, ch, true);
         }
-
+    
         controls.update();
         renderer.render(scene, camera);
-
+    
         if (compassCamera && compassRenderer) {
             compassCamera.position.copy(camera.position);
             compassCamera.position.sub(controls.target); 
@@ -1033,6 +1063,34 @@ function init3DWorkspace() {
             compassCamera.lookAt(0, 0, 0);
             
             compassRenderer.render(compassScene, compassCamera);
+    
+            // 🔄 Update 2D Overlay HTML Label Screen Positions
+            // Check if labels are initialized yet (prevents race-condition crashes on load)
+            if (typeof xLabel2D !== 'undefined' && compassAxes) {
+                const width = 80;
+                const height = 80;
+                const tempV = new THREE.Vector3();
+    
+                // Ensure world matrix structures are calculated up to this frame
+                compassScene.updateMatrixWorld(true);
+    
+                const updateLabelPosition = (element, localEndpoint) => {
+                    // 1. Convert local helper endpoint to world space
+                    tempV.copy(localEndpoint).applyMatrix4(compassAxes.matrixWorld);
+                    // 2. Project world space coords directly into NDC clip space (-1 to +1)
+                    tempV.project(compassCamera);
+                    // 3. Map NDC coordinates into 80x80px bounding DIV pixels
+                    const x = (tempV.x * 0.5 + 0.5) * width;
+                    const y = (-tempV.y * 0.5 + 0.5) * height;
+                    
+                    element.style.left = `${x}px`;
+                    element.style.top = `${y}px`;
+                };
+    
+                updateLabelPosition(xLabel2D, endpointX);
+                updateLabelPosition(yLabel2D, endpointY);
+                updateLabelPosition(zLabel2D, endpointZ);
+            }
         }
     }
     animate();
