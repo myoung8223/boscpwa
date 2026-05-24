@@ -2,10 +2,10 @@
 const BUILD_NUMBER = "58"; // <-- Increment this number whenever you commit!
 
 // 🍯 Import standalone, offline-ready CodeJar framework
-import { CodeJar } from './libs/codejar.js';
+import { CodeJar } from './libs/codejar.min.js';
 
 // Dom Elements
-const editor = document.getElementById('editor');
+const editorElement = document.getElementById('editor'); // Pointing to the new CodeJar div
 const consoleBox = document.getElementById('console');
 const btnSave = document.getElementById('btn-save');
 const fileLoad = document.getElementById('file-load');
@@ -19,6 +19,12 @@ const projectNameInput = document.getElementById('project-name-input');
 const editorFontSizeSelect = document.getElementById('editor-font-size-select');
 const modelColorInput = document.getElementById('model-color');
 const btnColorTrigger = document.getElementById('btn-color-trigger');
+
+// 🍯 INITIALIZE CODEJAR INSTANCE
+// Connects the text listener module to global Prism syntax coloring
+const jar = CodeJar(editorElement, (el) => {
+    Prism.highlightElement(el);
+});
 
 // ==========================================================================
 // 🖥️ PERSISTENT CONSOLE VISIBILITY TOGGLE
@@ -50,7 +56,6 @@ if (consoleBox && toggleConsoleBtn) {
     applyConsoleLayout(isConsoleVisible);
 
     // 3. Click Listener: Put this INSIDE the conditional block!
-    // Now it can perfectly see 'isConsoleVisible' and 'applyConsoleLayout'
     toggleConsoleBtn.addEventListener('click', () => {
         applyConsoleLayout(!isConsoleVisible);
         
@@ -69,11 +74,13 @@ const lineNumbersDiv = document.getElementById('line-numbers');
 // 🔄 GLOBAL BRIDGE: This lets any function lower down in app.js trigger a line recount!
 let triggerLineUpdate = null;
 
-if (editor && lineNumbersDiv && toggleLinesBtn) {
+if (editorElement && lineNumbersDiv && toggleLinesBtn) {
     
-    // 1. Core Generator: Count lines in textarea and populate sidebar
-    const updateLineNumbers = () => {
-        const linesCount = editor.value.split('\n').length;
+    // 1. Core Generator: Count lines inside CodeJar string matrix and populate sidebar
+    const updateLineNumbers = (codeText) => {
+        // Fallback to reading the engine directly if code string isn't explicitly passed
+        const currentCode = (typeof codeText === 'string') ? codeText : jar.toString();
+        const linesCount = currentCode.split('\n').length;
         const linesArray = Array.from({ length: linesCount }, (_, i) => i + 1);
         lineNumbersDiv.innerHTML = linesArray.join('<br>');
     };
@@ -81,12 +88,15 @@ if (editor && lineNumbersDiv && toggleLinesBtn) {
     // Expose the internal function to our global bridge variable
     triggerLineUpdate = updateLineNumbers;
 
-    // Synchronize numbers whenever typing, pasting, or loading files
-    editor.addEventListener('input', updateLineNumbers);
+    // Synchronize numbers and local cache continuously via CodeJar's built-in event hook
+    jar.onUpdate((code) => {
+        updateLineNumbers(code);
+        localStorage.setItem('openscad_editor_cache', code);
+    });
 
-    // 2. Scroll Synchronization: Lock sidebar position to editor text scroll
-    editor.addEventListener('scroll', () => {
-        lineNumbersDiv.scrollTop = editor.scrollTop;
+    // 2. Scroll Synchronization: Lock sidebar position to CodeJar div text scroll track
+    editorElement.addEventListener('scroll', () => {
+        lineNumbersDiv.scrollTop = editorElement.scrollTop;
     });
 
     // 3. Persistent Visibility Toggle Management
@@ -103,7 +113,7 @@ if (editor && lineNumbersDiv && toggleLinesBtn) {
             // 🔄 FORCE RECALCULATION: Populate text lines immediately when turning visible
             updateLineNumbers();
             // Sync up scroll layout in case user scrolled while it was hidden
-            lineNumbersDiv.scrollTop = editor.scrollTop;
+            lineNumbersDiv.scrollTop = editorElement.scrollTop;
         } else {
             lineNumbersDiv.style.display = 'none';
             toggleLinesBtn.textContent = 'Disabled';
@@ -114,13 +124,9 @@ if (editor && lineNumbersDiv && toggleLinesBtn) {
     };
 
     // 🚀 INITIALIZE CODES ON PAGE BOOT UP:
-    // First, count lines for existing boilerplate template code
     updateLineNumbers();
-    
-    // Second, apply layout preference immediately (handles hidden state if cached)
     applyLinesLayout(isLinesEnabled);
 
-    // Click Listener: Flip line settings on user interaction
     toggleLinesBtn.addEventListener('click', () => {
         applyLinesLayout(!isLinesEnabled);
     });
@@ -141,8 +147,8 @@ updateWindowTitle();
 // ---- PERSISTENT FONT SIZE INITIALIZATION ----
 const savedFontSizeStr = localStorage.getItem('openscad_editor_font_size') || '14px';
 
-if (editor && editorFontSizeSelect) {
-    editor.style.fontSize = savedFontSizeStr;
+if (editorElement && editorFontSizeSelect) {
+    editorElement.style.fontSize = savedFontSizeStr;
     editorFontSizeSelect.value = savedFontSizeStr;
 }
 
@@ -180,7 +186,7 @@ function logToConsole(message) {
 
 // Save local .scad file
 btnSave.addEventListener('click', () => {
-    const code = editor.value;
+    const code = jar.toString(); // 🍯 UPGRADED: Pull code string directly from CodeJar
     const blob = new Blob([code], { type: 'text/plain' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
@@ -193,11 +199,6 @@ btnSave.addEventListener('click', () => {
     logToConsole(`Saved ${safeFilename}.scad successfully.`);
 });
 
-// LocalStorage Continuous Keypress Auto-Save Hook
-editor.addEventListener('input', () => {
-    localStorage.setItem('openscad_editor_cache', editor.value);
-});
-
 // Load local .scad file
 fileLoad.addEventListener('change', (event) => {
     const file = event.target.files[0];
@@ -205,10 +206,10 @@ fileLoad.addEventListener('change', (event) => {
     
     const reader = new FileReader();
     reader.onload = (e) => {
-        editor.value = e.target.result;
+        jar.updateCode(e.target.result); // 🍯 UPGRADED: Seed loaded text into CodeJar frame
         logToConsole(`Loaded file: ${file.name}`);
 
-        localStorage.setItem('openscad_editor_cache', editor.value);
+        localStorage.setItem('openscad_editor_cache', e.target.result);
 
         let nameFromDisk = file.name.replace(/\.scad$/i, '');
         activeProjectName = nameFromDisk;
@@ -271,92 +272,28 @@ modelColorInput.addEventListener('input', (event) => {
     }
 });
 
-// Smart Symmetrical Indentation Engine: Handles Tab, Shift+Tab, and Multi-line Blocks
-editor.addEventListener('keydown', (event) => {
-    if (event.key === 'Tab') {
-        event.preventDefault(); 
-
-        const start = editor.selectionStart;
-        const end = editor.selectionEnd;
-        const value = editor.value;
-        const isShift = event.shiftKey; 
-
-        if (start === end) {
-            if (!isShift) {
-                editor.value = value.substring(0, start) + "\t" + value.substring(end);
-                editor.selectionStart = editor.selectionEnd = start + 1;
-            } else {
-                const lineStartPos = value.lastIndexOf('\n', start - 1) + 1;
-                
-                if (value.startsWith('\t', lineStartPos)) {
-                    editor.value = value.substring(0, lineStartPos) + value.substring(lineStartPos + 1);
-                    editor.selectionStart = editor.selectionEnd = Math.max(lineStartPos, start - 1);
-                } else if (value.substring(lineStartPos, lineStartPos + 4) === "    ") {
-                    editor.value = value.substring(0, lineStartPos) + value.substring(lineStartPos + 4);
-                    editor.selectionStart = editor.selectionEnd = Math.max(lineStartPos, start - 4);
-                }
-            }
-        } 
-        else {
-            const selectStartLineStart = value.lastIndexOf('\n', start - 1) + 1;
-            const selectEndLineEnd = value.indexOf('\n', end);
-            const finalEndPos = selectEndLineEnd === -1 ? value.length : selectEndLineEnd;
-
-            const targetBlock = value.substring(selectStartLineStart, finalEndPos);
-            let modifiedBlock = "";
-            let charsChangedCount = 0;
-
-            if (!isShift) {
-                modifiedBlock = targetBlock.split('\n').map(line => '\t' + line).join('\n');
-                charsChangedCount = modifiedBlock.length - targetBlock.length;
-            } else {
-                modifiedBlock = targetBlock.split('\n').map(line => {
-                    if (line.startsWith('\t')) {
-                        return line.substring(1); 
-                    } else if (line.startsWith('    ')) {
-                        return line.substring(4); 
-                    }
-                    return line; 
-                }).join('\n');
-                charsChangedCount = modifiedBlock.length - targetBlock.length;
-            }
-
-            editor.value = value.substring(0, selectStartLineStart) + modifiedBlock + value.substring(finalEndPos);
-            editor.selectionStart = selectStartLineStart;
-            editor.selectionEnd = finalEndPos + charsChangedCount;
-        }
-    }
-});
-
 async function initOpenSCAD() {
-    // Clear out the console box completely before writing our clean layout
-    //consoleBox.textContent = "";
-    
-    //logToConsole('Basic OpenSCAD PWA - By: Mike Young');
     logToConsole(`Build ${BUILD_NUMBER} - May 22, 2026`);
     logToConsole('System ready. Instantiating WASM...');
     
     // Restore persistent code cache
     const savedCode = localStorage.getItem('openscad_editor_cache');
     if (savedCode && savedCode.trim() !== "") {
-        editor.value = savedCode;
+        jar.updateCode(savedCode); // 🍯 UPGRADED
         logToConsole('Restored draft layout from your last active session.');
     } else {
-        //editor.value = `// Welcome to your Mobile PWA CAD Environment\ncube([10, 15, 20], center=true);\n\ntranslate([0, 0, 15]) {\n    sphere(r=8);\n}`;
-        //editor.value = `linear_extrude(height = 4) {\n    text(\n        text = "Hello, world!", \n        size = 14, \n        font = "Liberation Sans:style=Bold", \n        halign = "center", \n        valign = "center"\n    );\n}`;
-        editor.value = `linear_extrude(height = 4) {\n\ttext(\n\t\ttext = "Hello, world!", \n\t\tsize = 14, \n\t\tfont = "Liberation Sans:style=Bold", \n\t\thalign = "center", \n\t\tvalign = "center"\n\t);\n}`;
+        const defaultCode = `linear_extrude(height = 4) {\n\ttext(\n\t\ttext = "Hello, world!", \n\t\tsize = 14, \n\t\tfont = "Liberation Sans:style=Bold", \n\t\thalign = "center", \n\t\tvalign = "center"\n\t);\n}`;
+        jar.updateCode(defaultCode); // 🍯 UPGRADED
         logToConsole('Seeded editor workspace with default starter geometry.');
     }
 
     // 🚀 UPDATE LINE NUMBERS INSTANTLY ON PAGE LOAD
-    // This executes right after the editor text value has been assigned above
     if (typeof triggerLineUpdate === 'function') {
         triggerLineUpdate();
     }
     
     logToConsole('Loading browser-optimized OpenSCAD module...');
     try {
-        //const OpenSCADModule = await import('https://code4fukui.github.io/scad2stl/openscad.js');
         const OpenSCADModule = await import('./libs/openscad.js');
         
         openSCADFactory = OpenSCADModule.default || OpenSCADModule.createOpenSCAD || OpenSCADModule;
@@ -389,9 +326,7 @@ async function initOpenSCAD() {
                 const arrayBuffer = await response.arrayBuffer();
                 const fontData = new Uint8Array(arrayBuffer);
                 
-                // STORE IN THE BACKPACK
                 fontCache[fontName] = fontData;
-                
                 logToConsole(`✔ Cached ${fontName} in memory (${fontData.byteLength} bytes)`);
             } catch (fontErr) {
                 console.error(`Error processing font asset "${fontName}":`, fontErr);
@@ -401,10 +336,8 @@ async function initOpenSCAD() {
         logToConsole('✅ Typography suite successfully cached in global memory!');
         logToConsole('OpenSCAD Engine ready! Alter code and click Preview freely.');
 
-        // 1. Enable the button for the user
         btnPreview.disabled = false;
         
-        // ---- 2. TRIGGER THE AUTOMATIC FIRST-RUN PREVIEW ----
         logToConsole('Running initial boot preview...');
         btnPreview.click();
         
@@ -424,7 +357,7 @@ btnPreview.addEventListener('click', async () => {
     }
 
     logToConsole('--- Generating Preview ---');
-    const scriptCode = editor.value;
+    const scriptCode = jar.toString(); // 🍯 UPGRADED: Pull raw string snapshot from CodeJar
     const errorLogs = [];
 
     try {
@@ -454,11 +387,9 @@ btnPreview.addEventListener('click', async () => {
             throw new Error("Failed to initialize virtual filesystem mapping on runtime spawn.");
         }
 
-        // --- NEW: UNPACK THE FONTS INTO THE FRESH SANDBOX ---
         try { instance.FS.mkdir('/fonts'); } catch(e) { /* ignore */ }
         
         for (const [fontName, fontData] of Object.entries(fontCache)) {
-            // Write to both paths for guaranteed discovery
             instance.FS.writeFile(`/${fontName}`, fontData);
             instance.FS.writeFile(`/fonts/${fontName}`, fontData);
             
@@ -472,7 +403,6 @@ btnPreview.addEventListener('click', async () => {
             instance.ENV.OPENSCAD_FONTDIR = '/fonts';
         }
         logToConsole('Typography injected into fresh compilation sandbox.');
-        // ----------------------------------------------------
 
         // 1. Write the user's code into the fresh instance's virtual memory
         instance.FS.writeFile('/input.scad', scriptCode);
@@ -486,17 +416,12 @@ btnPreview.addEventListener('click', async () => {
         if (instance.FS.analyzePath('/output.stl').exists) {
             logToConsole('SUCCESS: 3D Mesh computed.');
 
-            // 4. Read the raw binary STL data out of virtual memory
             const stlData = instance.FS.readFile('/output.stl');
 
-            // 5. Convert raw bytes to browser object URL
             currentStlBlob = new Blob([stlData], { type: 'application/sla' });
             const blobUrl = URL.createObjectURL(currentStlBlob);
             
-            // 6. PASS DATA TO OUR NEW THREE.JS INJECTION PIPELINE HANDLER
             update3DModelViewer(blobUrl);
-            
-            // 7. Hide overlay placeholder notifications
             placeholderText.style.display = 'none';
             
             logToConsole('3D View updated successfully.');
@@ -513,8 +438,9 @@ btnPreview.addEventListener('click', async () => {
                 }
             }
 
+            // 🍯 Note: Highlight line feature skipped for editable inputs to preserve focus states safely
             if (detectedErrorLine) {
-                highlightEditorLine(detectedErrorLine);
+                logToConsole(`👉 Suspected syntax break near Line ${detectedErrorLine}.`);
             }
         }
 
@@ -523,37 +449,6 @@ btnPreview.addEventListener('click', async () => {
         console.error(error);
     }
 });
-
-// Helper function to handle text calculations and highlight the line
-function highlightEditorLine(lineNumber) {
-    const text = editor.value;
-    const lines = text.split('\n');
-    
-    let targetLine = lineNumber;
-    
-    // COMPILER OFFSET ADJUSTMENT
-    // If the parser complains about a line that is just an end brace, 
-    // the missing semicolon is almost certainly on the line above it.
-    if (targetLine > 1 && lines[targetLine - 1].trim() === '}') {
-        targetLine--; 
-    }
-
-    // Safety fallback bounds check
-    if (targetLine > lines.length) targetLine = lines.length;
-
-    // Sum up character indexes to find the starting and ending string offsets
-    let startPos = 0;
-    for (let i = 0; i < targetLine - 1; i++) {
-        startPos += lines[i].length + 1; // +1 handles the original newline char (\n)
-    }
-    const endPos = startPos + lines[targetLine - 1].length;
-
-    // Pull focus to text box and visually highlight the text range
-    editor.focus();
-    editor.setSelectionRange(startPos, endPos);
-    
-    logToConsole(`👉 Highlighted suspected syntax break near Line ${targetLine}.`);
-}
 
 
 // ---- THE EXPORT TRIGGER (Save STL) ----
@@ -595,7 +490,6 @@ function init3DWorkspace() {
     const container = document.getElementById('viewer-3d');
     if (!container) return;
 
-    // MATH SAFEGUARD: Never allow a 0px dimension to touch the camera matrix
     const w = container.clientWidth || 500;
     const h = container.clientHeight || 500;
 
@@ -619,32 +513,16 @@ function init3DWorkspace() {
     controls.dampingFactor = 0.1;
     controls.target.set(0, 0, 0);
 
-    /*
-    // ---- SANITY CHECK: INJECT RAINBOW TEST GEOMETRY ----
-    const testGeometry = new THREE.BoxGeometry(10, 10, 10);
-    // MeshNormalMaterial is completely immune to lighting and always renders bright neon colors
-    const testMaterial = new THREE.MeshNormalMaterial({ wireframe: true }); 
-    const testBox = new THREE.Mesh(testGeometry, testMaterial);
-    scene.add(testBox);
-    console.log("[Sanity Check]: Rainbow wireframe box added to workspace.");
-    // ---------------------------------------------------
-    */
-
     // ---- 3D WORKSPACE GRID AND ORIGIN AXES ----
-    // Size 400 with 40 divisions creates perfect 10mm grid cells across a 400x400mm bed
     const gridHelper = new THREE.GridHelper(400, 40, 0x007acc, 0x444444);
-    // Push it down just a tiny hair so models sitting perfectly at Z=0 don't Z-fight with the lines
     gridHelper.position.y = -0.05; 
     scene.add(gridHelper);
 
-    // Main origin axes helper scaled up to 50mm long so it's clearly visible on the large bed
     const axesHelper = new THREE.AxesHelper(50);
-    // Rotate the axes helper so the Blue Z line points straight UP
     axesHelper.rotation.x = -Math.PI / 2;    
     scene.add(axesHelper);
 
-    // ---- FEATURE 2: CORNER NAVIGATION COMPASS GENERATOR ----
-    // Create a mini-overlay DOM container programmatically inside the viewer
+    // ---- CORNER NAVIGATION COMPASS GENERATOR ----
     const compassContainer = document.createElement('div');
     compassContainer.style.position = 'absolute';
     compassContainer.style.top = '10px';
@@ -652,82 +530,37 @@ function init3DWorkspace() {
     compassContainer.style.width = '80px';
     compassContainer.style.height = '80px';
     compassContainer.style.zIndex = '100';
-    compassContainer.style.pointerEvents = 'none'; // Keeps mouse events focused on main view orbit
+    compassContainer.style.pointerEvents = 'none'; 
     container.appendChild(compassContainer);
 
-    // Setup an isolated mini-subscene for the compass
     const compassScene = new THREE.Scene();
     const compassCamera = new THREE.PerspectiveCamera(50, 1, 1, 100);
     
-    const compassRenderer = new THREE.WebGLRenderer({ alpha: true, antialias: true }); // Alpha ensures container stays transparent
+    const compassRenderer = new THREE.WebGLRenderer({ alpha: true, antialias: true }); 
     compassRenderer.setSize(80, 80);
     compassRenderer.setPixelRatio(window.devicePixelRatio);
     compassContainer.appendChild(compassRenderer.domElement);
 
-    // Create custom color-coded navigation arrows or standard axes line arrays for the corner
     const compassAxes = new THREE.AxesHelper(25);
-    // Rotate the corner compass axes to match the viewport alignment perfectly
     compassAxes.rotation.x = -Math.PI / 2;
     compassScene.add(compassAxes);
 
-    /*
-    // 5. Lighting Environment Setup
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
-    scene.add(ambientLight);
-
-    const dirLight1 = new THREE.DirectionalLight(0xffffff, 0.8);
-    dirLight1.position.set(50, 50, 50);
-    scene.add(dirLight1);
-    */
-
-    /*
-    // ---- UPGRADED: THREE-POINT STUDIO LIGHTING SYSTEM ----
-    // 1. Low Ambient Light: Keeps shadows from being pitch black, but doesn't wash out details
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.25);
-    scene.add(ambientLight);
-
-    // 2. Primary Key Light: Strong white light hitting the model from the front-top-right
-    const keyLight = new THREE.DirectionalLight(0xffffff, 0.85);
-    keyLight.position.set(100, 150, 50);
-    scene.add(keyLight);
-
-    // 3. Secondary Fill Light: Softer, warmer light from the opposite side to soften harsh shadow edges
-    const fillLight = new THREE.DirectionalLight(0xeeeeff, 0.4);
-    fillLight.position.set(-100, 80, -50);
-    scene.add(fillLight);
-
-    // 4. Rim/Top Light: Placed straight above pointing down to crisp up top edges and embossing
-    const topLight = new THREE.DirectionalLight(0xffffff, 0.3);
-    topLight.position.set(0, 200, 0);
-    scene.add(topLight);
-    */
-
     // ---- 🖥️ OPENSCAD-OPTIMIZED CAD LIGHTING SYSTEM ----
-
-    // 1. High-Baseline Ambient Light (The Under-Side Lifter)
-    // OpenSCAD keeps its minimum darks very bright so you can always see bottom faces.
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.55); // Bumped from 0.25 to 0.55
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.55); 
     scene.add(ambientLight);
 
-    // 2. Fixed Studio Key Light (The Dimension definer)
-    // Provides crisp orientation shadows from a high front-right angle.
     const keyLight = new THREE.DirectionalLight(0xffffff, 0.5); 
     keyLight.position.set(150, 200, 100);
     scene.add(keyLight);
 
-    // 3. Subdued Top Light (No longer overpowering)
-    // Toned down dramatically so it only subtly catches top-facing planes.
-    const topLight = new THREE.DirectionalLight(0xffffff, 0.15); // Cut from 0.3 to 0.15
+    const topLight = new THREE.DirectionalLight(0xffffff, 0.15); 
     topLight.position.set(0, 250, 0);
     scene.add(topLight);
 
-    // 4. The "Headlight" (Crucial OpenSCAD Secret Weapon)
-    // This directional light sits exactly at the camera lens position. 
-    // It must be added to the CAMERA instead of the SCENE so it moves when you orbit!
     const headlight = new THREE.DirectionalLight(0xffffff, 0.45);
-    headlight.position.set(0, 0, 1); // Relative to the camera's local space, pointing forward
+    headlight.position.set(0, 0, 1); 
     camera.add(headlight); 
-    scene.add(camera); // Ensure camera is in scene so its children lights render!
+    scene.add(camera); 
     
     // 6. Robust Animation Loop with Live Layout Boundary Matching
     function animate() {
@@ -750,10 +583,9 @@ function init3DWorkspace() {
 
         // --- COMPASS SYNCHRONIZATION MATRIX PASSTHROUGH ---
         if (compassCamera && compassRenderer) {
-            // Force the mini camera to sit at an identical layout angle vector relative to the origin
             compassCamera.position.copy(camera.position);
-            compassCamera.position.sub(controls.target); // Subtract controls focus target to handle panning
-            compassCamera.position.setLength(60); // Constrain tracking orbit distance radius
+            compassCamera.position.sub(controls.target); 
+            compassCamera.position.setLength(60); 
             compassCamera.lookAt(0, 0, 0);
             
             compassRenderer.render(compassScene, compassCamera);
@@ -770,12 +602,10 @@ function update3DModelViewer(blobUrl) {
     let savedPosition = null;
     let savedTarget = null;
     
-    // Only capture if a current model exists (meaning this isn't the first load)
     if (currentMesh && camera && controls) {
         savedPosition = camera.position.clone();
         savedTarget = controls.target.clone();
     }
-    // ---------------------------------------------------------------
 
     if (currentMesh) {
         scene.remove(currentMesh);
@@ -793,12 +623,11 @@ function update3DModelViewer(blobUrl) {
         // ==========================================================================
         const material = new THREE.MeshStandardMaterial({ 
             color: activeModelColor, 
-            roughness: 0.85,     // Spreads out specular highlights for plastic finish, was 0.65
-            metalness: 0.05,     // Slightly reduced from 0.70 to look like engineering plastic instead of polished steel, was 0.2
+            roughness: 0.85,     
+            metalness: 0.05,     
             wireframe: wireframeMode 
         });
 
-        // Inject the custom GLSL code right into Three.js's standard shader program
         material.onBeforeCompile = (shader) => {
             const noiseGLSL = `
                 float hash(vec2 p) {
@@ -814,14 +643,8 @@ function update3DModelViewer(blobUrl) {
             shader.fragmentShader = shader.fragmentShader.replace(
                 `#include <opaque_fragment>`,
                 `
-                // 🔄 TEXTURE TUNING KNOBS:
-                // 1. Scale Multiplier (4.0): Dropped from 8.0 to make the noise grains LARGER and more visible.
-                // 2. Contrast Multiplier (0.12): Bumped from 0.04 to make the shadows and highlights 3x DEEPER.
                 float noiseGrit = proceduralNoise(vViewPosition * 4.0) * 0.12;
-                
-                // Subtracting half of the contrast (0.06) keeps the overall model brightness perfectly balanced
                 outgoingLight.rgb += vec3(noiseGrit - 0.06);
-                
                 #include <opaque_fragment>
                 `
             );
@@ -830,40 +653,28 @@ function update3DModelViewer(blobUrl) {
         
         currentMesh = new THREE.Mesh(geometry, material);
         
-        // ---- COORDINATE ENGINE FIXED MATRIX CONVERSIONS ----
-        // 1. ABSOLUTELY NO AUTO-CENTERING REPOSITIONING. 
-        // Keep the model perfectly clamped to its code-defined coordinates.
         currentMesh.position.set(0, 0, 0);
-
-        // 2. SWAP THE COORDINATE MATRIX TO MATCH OPENSCAD Z-UP ARCHITECTURE
-        // Rotating -90 degrees (-Math.PI / 2) maps OpenSCAD Z onto Three.js Y
         currentMesh.rotation.x = -Math.PI / 2;
 
         scene.add(currentMesh);
-        // --------------------------------------------------
         
         geometry.computeBoundingBox();
         geometry.computeBoundingSphere();
         
         // ---- STEP 2: RESTORE VIEW OR INITIALIZE CAMERA POSITION ----
         if (savedPosition && savedTarget) {
-            // SUBSEQUENT PREVIEWS: Seamlessly drop the camera right back where it was
             camera.position.copy(savedPosition);
             controls.target.copy(savedTarget);
         } else {
-            // FIRST RUN ONLY: Auto-fit the perspective zoom based on overall model volume
             const radius = geometry.boundingSphere.radius;
             const targetDistance = radius > 0 ? radius * 3.5 : 50; 
 
-            // Set an ergonomic initial perspective angle looking down at the origin
             camera.position.set(targetDistance, targetDistance * 1.2, targetDistance);
-            controls.target.set(0, 0, 0); // Lock rotation pivot permanently to true [0,0,0] origin
+            controls.target.set(0, 0, 0); 
             camera.lookAt(0, 0, 0);
         }
         
-        // CRITICAL: Force OrbitControls to synchronize its internal matrices with the current state
         controls.update();
-        // ------------------------------------------------------------
         
     }, undefined, (err) => console.error('[Viewer Error]:', err));
 }
@@ -886,30 +697,22 @@ btnWireframe.style.background = '#007acc'; // Vibrant active solid blue
 // ⚙️ SETTINGS OVERLAY CONTROLLER LOGIC
 // ==========================================================================
 
-// 1. Grab the new DOM structural element references
 const btnSettings = document.getElementById('btn-settings');
 const btnCloseSettings = document.getElementById('btn-close-settings');
 const settingsOverlay = document.getElementById('settings-overlay');
 
-/**
- * Opens the workspace settings modal panel
- */
 function openSettingsMenu() {
     if (settingsOverlay) {
         settingsOverlay.classList.remove('hidden');
     }
 }
 
-/**
- * Closes the workspace settings modal panel
- */
 function closeSettingsMenu() {
     if (settingsOverlay) {
         settingsOverlay.classList.add('hidden');
     }
 }
 
-// 2. Attach clean, dedicated click listeners to open and close the view
 if (btnSettings) {
     btnSettings.addEventListener('click', openSettingsMenu);
 }
@@ -918,14 +721,12 @@ if (btnCloseSettings) {
     btnCloseSettings.addEventListener('click', closeSettingsMenu);
 }
 
-// 3. Ambient UX: Close the settings card if the user clicks anywhere on the dark blurred background tint
 window.addEventListener('click', (event) => {
     if (event.target === settingsOverlay) {
         closeSettingsMenu();
     }
 });
 
-// 4. Keyboard Accessibility: Close the window instantly if the user presses the Escape key
 window.addEventListener('keydown', (event) => {
     if (event.key === 'Escape' && settingsOverlay && !settingsOverlay.classList.contains('hidden')) {
         logToConsole('⌨️ Hotkey Triggered: [Escape] - Closing Settings');
@@ -936,18 +737,12 @@ window.addEventListener('keydown', (event) => {
 // 5. Project Name Change Event Handler
 if (projectNameInput) {
     projectNameInput.addEventListener('input', (event) => {
-        // Strip any illegal filename path characters while typing
         let cleanedName = event.target.value.replace(/[/\\?%*:|"<>. ]/g, '_');
-        
-        // Update global variable and local storage cache instantly
         activeProjectName = cleanedName || 'untitled';
         localStorage.setItem('openscad_project_name', activeProjectName);
-        
-        // Sync straight to the desktop window top border panel frame
         updateWindowTitle();
     });
     
-    // Optional: when the input field loses focus, reset empty fields to 'untitled'
     projectNameInput.addEventListener('blur', (event) => {
         if (!event.target.value.trim()) {
             event.target.value = 'untitled';
@@ -958,13 +753,13 @@ if (projectNameInput) {
     });
 }
 
-// 🟢 NEW: Live Editor Text Scaling Change Listener
+// 🟢 Editor Text Scaling Change Listener
 if (editorFontSizeSelect) {
     editorFontSizeSelect.addEventListener('change', (event) => {
         const selectedSize = event.target.value;
         localStorage.setItem('openscad_editor_font_size', selectedSize);
-        if (editor) {
-            editor.style.fontSize = selectedSize;
+        if (editorElement) {
+            editorElement.style.fontSize = selectedSize;
         }
         logToConsole(`🔎 Editor text scaled to: ${selectedSize}`);
     });
@@ -973,26 +768,18 @@ if (editorFontSizeSelect) {
 // 6. Camera Viewport Boundary Reset Engine
 if (btnCameraReset) {
     btnCameraReset.addEventListener('click', () => {
-        // Safety Check: Verify if a model is actually rendered on screen
         if (currentMesh && currentMesh.geometry && camera && controls) {
-            
             const geometry = currentMesh.geometry;
-            
-            // Execute your engine's native bounding box framing math
             const radius = geometry.boundingSphere.radius;
             const targetDistance = radius > 0 ? radius * 3.5 : 50;
             
             logToConsole('🎥 Resetting camera matrix to factory default frame parameters...');
             
-            // Match your system's exact starting boot coordinates
             camera.position.set(targetDistance, targetDistance * 1.2, targetDistance);
-            controls.target.set(0, 0, 0); // Re-clamp rotation pivot back to true center
+            controls.target.set(0, 0, 0); 
             camera.lookAt(0, 0, 0);
             
-            // Force OrbitControls to synchronize and update its matrices
             controls.update();
-            
-            // Ambient UX: Close the settings overlay panel so they instantly see the view shift
             closeSettingsMenu();
         }
     });
@@ -1006,33 +793,25 @@ const leftPaneContainer = document.getElementById('left-pane-container');
 const panelSplitGutter = document.getElementById('panel-split-gutter');
 
 if (leftPaneContainer && panelSplitGutter) {
-    // 1. Initial Load: Apply cached split layout percentages from memory (defaults to 50%)
     const cachedSplitValue = localStorage.getItem('openscad_layout_split') || '50';
     leftPaneContainer.style.width = `${cachedSplitValue}%`;
 
-    // 2. Wire up the drag mouse capturing trigger
     panelSplitGutter.addEventListener('mousedown', (e) => {
         e.preventDefault();
         
-        // Prevent random text selection highlighted layers while dragging across elements
         document.body.style.cursor = 'col-resize';
         document.body.style.userSelect = 'none';
 
         function onMouseMove(moveEvent) {
-            // Translate the raw cursor client pixels into window aspect width percentage metrics
             let calculatedWidthPercent = (moveEvent.clientX / window.innerWidth) * 100;
 
-            // Safe Limits: Stop code or 3D view screens from crushing down past a 15% footprint
             if (calculatedWidthPercent < 15) calculatedWidthPercent = 15;
             if (calculatedWidthPercent > 85) calculatedWidthPercent = 85;
 
-            // Live transform the style properties
             leftPaneContainer.style.width = `${calculatedWidthPercent}%`;
             
-            // Lock value directly to background system cache storage
             localStorage.setItem('openscad_layout_split', Math.round(calculatedWidthPercent).toString());
             
-            // Core Pipeline Update: Recompute the WebGL dimensions instantly on drag update
             if (typeof renderer !== 'undefined' && renderer && typeof camera !== 'undefined' && camera) {
                 const container3d = document.getElementById('viewer-3d');
                 if (container3d) {
@@ -1048,18 +827,15 @@ if (leftPaneContainer && panelSplitGutter) {
         }
 
         function onMouseUp() {
-            // Tear down trackers immediately on click-release
             document.removeEventListener('mousemove', onMouseMove);
             document.removeEventListener('mouseup', onMouseUp);
             
-            // Clean cursor layout artifacts
             document.body.style.cursor = 'default';
             document.body.style.userSelect = 'text';
             
             logToConsole(`📐 Split layout updated and cached to: ${localStorage.getItem('openscad_layout_split')}%`);
         }
 
-        // Apply global event listeners so cursor remains active if dragged fast outside the line area
         document.addEventListener('mousemove', onMouseMove);
         document.addEventListener('mouseup', onMouseUp);
     });
