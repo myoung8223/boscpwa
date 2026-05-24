@@ -1,5 +1,5 @@
 // ---- BUILD VERSION CONTROLLER ----
-const BUILD_NUMBER = "64"; // <-- Incremented for Event Capture Phase Interceptor!
+const BUILD_NUMBER = "65"; // <-- Incremented for OpenSCAD Tab Replacement Logic
 
 // 🍯 Import standalone, offline-ready CodeJar framework
 import { CodeJar } from './libs/codejar.min.js';
@@ -55,9 +55,14 @@ if (editorElement) {
 
             let { start, end } = getSelectionCharacterOffsetWithin(editorElement);
             const value = jar.toString();
+            
+            // 🔍 Check if the current selection spans across multiple lines
+            const selectedText = value.substring(start, end);
+            const isMultiLineSelection = selectedText.includes('\n');
 
-            // SCENARIO 1: Standard single-cursor inline Tab insertion
-            if (start === end && !event.shiftKey) {
+            // SCENARIO 1: Single-Line Tab Replacement
+            // If we are NOT holding Shift, and the selection DOES NOT cross a line break, replace it with a Tab
+            if (!isMultiLineSelection && !event.shiftKey) {
                 const newCode = value.substring(0, start) + '\t' + value.substring(end);
                 jar.updateCode(newCode);
                 setSelectionCharacterOffsetWithin(editorElement, start + 1, start + 1);
@@ -107,6 +112,10 @@ if (editorElement) {
                     } else if (line.startsWith('    ')) {
                         reduction = 4;
                         newLine = line.substring(4);
+                    } else if (line.match(/^ +/)) {
+                        const spaces = line.match(/^ +/)[0].length;
+                        reduction = Math.min(spaces, 4);
+                        newLine = line.substring(reduction);
                     }
                     
                     const absoluteLineStart = selectStartLineStart + currentPosInBlock;
