@@ -1006,21 +1006,21 @@ function init3DWorkspace() {
         el.style.color = color;
         el.style.fontFamily = 'Arial, sans-serif';
         el.style.fontWeight = 'bold';
-        el.style.fontSize = '12px'; 
+        el.style.fontSize = '10px'; 
         el.style.pointerEvents = 'none';
         el.style.transform = 'translate(-50%, -50%)'; // Perfect centering alignment
         compassContainer.appendChild(el);
         return el;
     };
 
-    create2DLabel('compass-lbl-x', 'X', '#aaaaaa');
-    create2DLabel('compass-lbl-y', 'Y', '#bbbbbb');
-    create2DLabel('compass-lbl-z', 'Z', '#cccccc');
+    create2DLabel('compass-lbl-x', 'X', '#444444');
+    create2DLabel('compass-lbl-y', 'Y', '#444444');
+    create2DLabel('compass-lbl-z', 'Z', '#444444');
 
     // Define the local 3D endpoints of your 25-unit axes lines
-    const endpointX = new THREE.Vector3(23, 0, 0);   // was 25
-    const endpointY = new THREE.Vector3(0, 23, 0);   // was 25
-    const endpointZ = new THREE.Vector3(0, 0, 23);   // was 25
+    const endpointX = new THREE.Vector3(20, 0, 0);   // was 25
+    const endpointY = new THREE.Vector3(0, 20, 0);   // was 25
+    const endpointZ = new THREE.Vector3(0, 0, 20);   // was 25
 
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.55); 
     scene.add(ambientLight);
