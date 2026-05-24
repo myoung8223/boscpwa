@@ -1,5 +1,5 @@
 // ---- BUILD VERSION CONTROLLER ----
-const BUILD_NUMBER = "64"; // <-- Incremented for Event Capture Phase Interceptor!
+const BUILD_NUMBER = "65"; // <-- Incremented for Event Capture Phase Interceptor!
 
 // 🍯 Import standalone, offline-ready CodeJar framework
 import { CodeJar } from './libs/codejar.min.js';
@@ -21,13 +21,30 @@ const modelColorInput = document.getElementById('model-color');
 const btnColorTrigger = document.getElementById('btn-color-trigger');
 
 // 🍯 INITIALIZE CODEJAR INSTANCE
+// Connects the text listener module to global Prism syntax coloring and matches brackets
 const jar = CodeJar(
     editorElement, 
     (el) => {
-        if (typeof Prism !== 'undefined') Prism.highlightElement(el);
-        try { applyInlineBracketMatching(el); } catch (e) { console.error("Bracket match error:", e); }
+        // 1. Run Prism to color the keywords first
+        if (typeof Prism !== 'undefined') {
+            Prism.highlightElement(el);
+        }
+        
+        // 2. Safely run our upgraded native text cursor bracket matching pass
+        try {
+            applyInlineBracketMatching(el);
+        } catch (e) {
+            console.error("Bracket matching engine error:", e);
+        }
     },
-    { tab: '\t', history: true, indentOn: /^\s*$/, addClosing: false } 
+    { 
+        tab: '', // 🎛️ Handled dynamically by our custom keyboard intercept matrix below
+        history: true,
+        indentOn: /^\s*$/,
+        open: /$^/,
+        close: /$^/,
+        moveTo: /$^
+    } 
 );
 
 // 🖱️ Passive navigation listeners
@@ -546,6 +563,7 @@ btnWireframe.addEventListener('click', () => {
     }
 });
 
+/*
 window.addEventListener('keydown', (event) => {
     if (event.ctrlKey && event.key === 'Enter') {
         event.preventDefault(); 
@@ -553,6 +571,179 @@ window.addEventListener('keydown', (event) => {
         if (!btnPreview.disabled) {
             logToConsole('⌨️ Hotkey Triggered: [Ctrl + Enter]');
             btnPreview.click(); 
+        }
+    }
+});
+*/
+
+// Global Application Hotkey Command Mappings
+window.addEventListener('keydown', (event) => {
+    if (event.ctrlKey && event.key === 'Enter') {
+        event.preventDefault(); 
+        if (!btnPreview.disabled) {
+            logToConsole('⌨️ Hotkey Triggered: [Ctrl + Enter]');
+            btnPreview.click(); 
+        }
+    }
+
+    // ==========================================================================
+    // 🎹 CONTEXT-AWARE CAD TABBING ENGINE: MATCHES NATIVE OPENSCAD BEHAVIOR
+    // ==========================================================================
+    if (event.key === 'Tab' && document.activeElement === editorElement) {
+        event.preventDefault(); // Halt native browser and framework bubble triggers
+
+        const selection = window.getSelection();
+        if (!selection.rangeCount) return;
+
+        const range = selection.getRangeAt(0);
+        const selectedText = range.toString();
+
+        // Check if the current user selection captures multiple distinct lines
+        const isMultiLineSelection = selectedText.includes('\n');
+
+        if (isMultiLineSelection) {
+            // ── MULTI-LINE SELECTION: INDENT ALL CONTAINED LINES ──
+            const startNode = range.startContainer;
+            const endNode = range.endContainer;
+            
+            // Extract code snapshots from the active DOM element container
+            let currentText = editorElement.textContent;
+            
+            // Calculate absolute start position within the character stream
+            let startOffset = 0;
+            let walker = document.createTreeWalker(editorElement, NodeFilter.SHOW_TEXT);
+            let node = walker.nextNode();
+            while (node && node !== startNode) {
+                startOffset += node.textContent.length;
+                node = walker.nextNode();
+            }
+            startOffset += range.startOffset;
+
+            // Find the true beginning boundary of the first highlighted line
+            const textBeforeSelection = currentText.substring(0, startOffset);
+            const lineStartIdx = textBeforeSelection.lastIndexOf('\n') + 1;
+
+            // Calculate absolute end position within the character stream
+            let endOffset = 0;
+            walker = document.createTreeWalker(editorElement, NodeFilter.SHOW_TEXT);
+            node = walker.nextNode();
+            while (node && node !== endNode) {
+                endOffset += node.textContent.length;
+                node = walker.nextNode();
+            }
+            endOffset += range.endOffset;
+
+            // Find the true ending boundary of the last highlighted line
+            let lineEndIdx = currentText.indexOf('\n', endOffset);
+            if (lineEndIdx === -1) lineEndIdx = currentText.length;
+
+            // Isolate the text lines marked for transformation
+            const textToTransform = currentText.substring(lineStartIdx, lineEndIdx);
+            
+            let processedLinesText;
+            if (event.shiftKey) {
+                // Shift + Tab: Remove one tab character or up to 4 leading spaces
+                processedLinesText = textToTransform.split('\n').map(line => {
+                    if (line.startsWith('\t')) return line.substring(1);
+                    if (line.startsWith('    ')) return line.substring(4);
+                    return line.replace(/^\s{1,3}/, ''); // Clear remaining unaligned spacing fragments
+                }).join('\n');
+            } else {
+                // Tab: Add a clean tab character to the front of all nested lines
+                processedLinesText = textToTransform.split('\n').map(line => '\t' + line).join('\n');
+            }
+
+            // Construct and inject the transformed text chunk back into the editor core
+            const finalizedText = currentText.substring(0, lineStartIdx) + processedLinesText + currentText.substring(lineEndIdx);
+            
+            // Overwrite and force syntax rendering engines to sync up layout positions
+            jar.updateCode(finalizedText);
+
+            // Re-establish selection boundaries across the transformed code blocks
+            const newRange = document.createRange();
+            let accumulatedChars = 0;
+            let targetStartNode = null, targetStartOffset = 0;
+            let targetEndNode = null, targetEndOffset = 0;
+
+            walker = document.createTreeWalker(editorElement, NodeFilter.SHOW_TEXT);
+            node = walker.nextNode();
+            
+            while (node) {
+                const nodeLen = node.textContent.length;
+                if (!targetStartNode && accumulatedChars + nodeLen >= lineStartIdx) {
+                    targetStartNode = node;
+                    targetStartOffset = lineStartIdx - accumulatedChars;
+                }
+                if (!targetEndNode && accumulatedChars + nodeLen >= (lineStartIdx + processedLinesText.length)) {
+                    targetEndNode = node;
+                    targetEndOffset = (lineStartIdx + processedLinesText.length) - accumulatedChars;
+                }
+                accumulatedChars += nodeLen;
+                node = walker.nextNode();
+            }
+            
+            if (targetStartNode && targetEndNode) {
+                newRange.setStart(targetStartNode, targetStartOffset);
+                newRange.setEnd(targetEndNode, targetEndOffset);
+                selection.removeAllRanges();
+                selection.addRange(newRange);
+            }
+
+        } else {
+            // ── SINGLE-LINE SELECTION: STANDARD DELETION AND TAB CHARACTER REPLACEMENT ──
+            if (event.shiftKey) {
+                // Shift + Tab on single line: Perform a quick inline outdent if whitespace matches
+                let currentText = editorElement.textContent;
+                let startOffset = 0;
+                let walker = document.createTreeWalker(editorElement, NodeFilter.SHOW_TEXT);
+                let node = walker.nextNode();
+                while (node && node !== range.startContainer) {
+                    startOffset += node.textContent.length;
+                    node = walker.nextNode();
+                }
+                startOffset += range.startOffset;
+
+                const textBeforeCursor = currentText.substring(0, startOffset);
+                const currentLineStartIdx = textBeforeCursor.lastIndexOf('\n') + 1;
+                const currentLine = currentText.substring(currentLineStartIdx, startOffset + selectedText.length);
+
+                if (currentLine.startsWith('\t') || currentLine.startsWith(' ')) {
+                    const spacesToRemove = currentLine.startsWith('\t') ? 1 : (currentLine.match(/^ {1,4}/)[0].length);
+                    const modifiedCode = currentText.substring(0, currentLineStartIdx) + currentLine.substring(spacesToRemove) + currentText.substring(currentLineStartIdx + currentLine.length);
+                    jar.updateCode(modifiedCode);
+                    
+                    // Re-position text cursor safely right after stripping indentation
+                    const newRange = document.createRange();
+                    let checkChars = 0;
+                    walker = document.createTreeWalker(editorElement, NodeFilter.SHOW_TEXT);
+                    node = walker.nextNode();
+                    while (node) {
+                        if (checkChars + node.textContent.length >= Math.max(currentLineStartIdx, startOffset - spacesToRemove)) {
+                            newRange.setStart(node, Math.max(currentLineStartIdx, startOffset - spacesToRemove) - checkChars);
+                            newRange.collapse(true);
+                            selection.removeAllRanges();
+                            selection.addRange(newRange);
+                            break;
+                        }
+                        checkChars += node.textContent.length;
+                        node = walker.nextNode();
+                    }
+                }
+            } else {
+                // Standard Tab: Directly replace selected characters with a structural tab character '\t'
+                const tabNode = document.createTextNode('\t');
+                range.deleteData(range.startOffset, range.toString().length); // Force wipe selection fragment
+                range.insertNode(tabNode);
+
+                // Move caret cursor cleanly behind the newly embedded tab character node
+                range.setStartAfter(tabNode);
+                range.setEndAfter(tabNode);
+                selection.removeAllRanges();
+                selection.addRange(range);
+
+                // Commit layout updates instantly to underlying CodeJar context models
+                jar.updateCode(editorElement.textContent);
+            }
         }
     }
 });
