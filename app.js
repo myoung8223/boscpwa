@@ -1,5 +1,5 @@
 // ---- BUILD VERSION CONTROLLER ----
-const BUILD_NUMBER = "75"; // <-- Incremented for Compiler Error Line Highlighting Engine
+const BUILD_NUMBER = "76"; // <-- Incremented for Compiler Error Line Highlighting Engine
 
 // 🍯 Import standalone, offline-ready CodeJar framework
 import { CodeJar } from './libs/codejar.min.js';
@@ -19,18 +19,6 @@ const projectNameInput = document.getElementById('project-name-input');
 const editorFontSizeSelect = document.getElementById('editor-font-size-select');
 const modelColorInput = document.getElementById('model-color');
 const btnColorTrigger = document.getElementById('btn-color-trigger');
-
-/*
-// 🍯 INITIALIZE CODEJAR INSTANCE
-const jar = CodeJar(
-    editorElement, 
-    (el) => {
-        if (typeof Prism !== 'undefined') Prism.highlightElement(el);
-        try { applyInlineBracketMatching(el); } catch (e) { console.error("Bracket match error:", e); }
-    },
-    { tab: '\t', history: true, indentOn: /[(\[{]$/, addClosing: false } 
-);
-*/
 
 // 🍯 INITIALIZE CODEJAR INSTANCE
 const jar = CodeJar(
@@ -497,15 +485,6 @@ let triggerLineUpdate = null;
 
 if (editorElement && lineNumbersDiv && toggleLinesBtn) {
 
-    /*
-    const updateLineNumbers = (codeText) => {
-        const currentCode = (typeof codeText === 'string') ? codeText : jar.toString();
-        const linesCount = currentCode.split('\n').length;
-        const linesArray = Array.from({ length: linesCount }, (_, i) => i + 1);
-        lineNumbersDiv.innerHTML = linesArray.join('<br>');
-    };
-    */
-
     const updateLineNumbers = (codeText) => {
         let currentCode = (typeof codeText === 'string') ? codeText : jar.toString();
         
@@ -603,6 +582,12 @@ if (btnColorTrigger) {
 
 let activeModelColor = parseInt(savedColorHexStr.replace('#', '0x'), 16);
 
+// 🌐 THREE.JS SCOPE VARIABLES
+let scene, camera, renderer, controls, currentMesh = null;
+let workspaceInitialized = false;
+let gridHelper = null;
+let axesGroup = null;
+
 let openSCADFactory = null;
 let currentStlBlob = null; 
 const fontCache = {}; 
@@ -675,19 +660,6 @@ btnWireframe.addEventListener('click', () => {
         currentMesh.material.wireframe = wireframeMode;
     }
 });
-
-/*
-window.addEventListener('keydown', (event) => {
-    if (event.ctrlKey && event.key === 'Enter') {
-        event.preventDefault(); 
-        
-        if (!btnPreview.disabled) {
-            logToConsole('⌨️ Hotkey Triggered: [Ctrl + Enter]');
-            btnPreview.click(); 
-        }
-    }
-});
-*/
 
 // ==========================================================================
 // ⌨️ GLOBAL APPLICATION HOTKEY COMMAND MAPPINGS
@@ -916,9 +888,6 @@ if ('serviceWorker' in navigator) {
     });
 }
 
-let scene, camera, renderer, controls, currentMesh = null;
-let workspaceInitialized = false;
-
 function init3DWorkspace() {
     if (workspaceInitialized) return; 
     workspaceInitialized = true;
@@ -945,24 +914,18 @@ function init3DWorkspace() {
     controls.dampingFactor = 0.1;
     controls.target.set(0, 0, 0);
 
-    /*
-    const gridHelper = new THREE.GridHelper(400, 40, 0x007acc, 0x444444);
-    gridHelper.position.y = -0.05; 
-    scene.add(gridHelper);
-    */
-
-
     // 1. Setup the main grid helper with a small polygon offset to prevent z-fighting
-    const gridHelper = new THREE.GridHelper(400, 40, 0x444444, 0x444444);
+    gridHelper = new THREE.GridHelper(400, 40, 0x444444, 0x444444);
     gridHelper.position.y = 0;  
     gridHelper.material.polygonOffset = true;
     gridHelper.material.polygonOffsetFactor = 1;
     gridHelper.material.polygonOffsetUnits = 1;
     scene.add(gridHelper);
 
+    // 2. Setup the group structure for independent line rendering and toggling
+    axesGroup = new THREE.Group();
     const gridHalfSize = 200;
 
-    // 2. Fixed configuration function using proper JavaScript object colons (:)
     const overlayConfig = (colorHex) => ({
         color: colorHex,
         depthTest: true,           // Models safely block the lines
@@ -978,7 +941,7 @@ function init3DWorkspace() {
         new THREE.Vector3(gridHalfSize, 0, 0)
     ]);
     const xAxisLine = new THREE.Line(xGeometry, new THREE.LineBasicMaterial(overlayConfig(0xcc5252)));
-    scene.add(xAxisLine);
+    axesGroup.add(xAxisLine);
 
     // --- Green Y-Axis Line ---
     const yGeometry = new THREE.BufferGeometry().setFromPoints([
@@ -986,20 +949,17 @@ function init3DWorkspace() {
         new THREE.Vector3(0, 0, gridHalfSize)
     ]);
     const yAxisLine = new THREE.Line(yGeometry, new THREE.LineBasicMaterial(overlayConfig(0x52cc7a)));
-    scene.add(yAxisLine);
+    axesGroup.add(yAxisLine);
 
     // --- Blue Z-Axis Line (Extending into both positive and negative Z space) ---
     const zGeometry = new THREE.BufferGeometry().setFromPoints([
-        new THREE.Vector3(0, -gridHalfSize, 0), // Starts deep in the negative vertical space
-        new THREE.Vector3(0, gridHalfSize, 0)   // Extends straight upward into positive space
+        new THREE.Vector3(0, -gridHalfSize, 0), 
+        new THREE.Vector3(0, gridHalfSize, 0)   
     ]);
     const zAxisLine = new THREE.Line(zGeometry, new THREE.LineBasicMaterial(overlayConfig(0x007acc)));
-    scene.add(zAxisLine);
+    axesGroup.add(zAxisLine);
     
-
-    //const axesHelper = new THREE.AxesHelper(50);
-    //axesHelper.rotation.x = -Math.PI / 2;    
-    //scene.add(axesHelper);
+    scene.add(axesGroup);
     
     const compassContainer = document.createElement('div');
     compassContainer.style.position = 'absolute';
@@ -1019,61 +979,25 @@ function init3DWorkspace() {
     compassRenderer.setPixelRatio(window.devicePixelRatio);
     compassContainer.appendChild(compassRenderer.domElement);
 
-    /*
-    const compassAxes = new THREE.AxesHelper(20);
-    compassAxes.rotation.x = -Math.PI / 2;
-    compassScene.add(compassAxes);
-
-    // 🏷️ Create 2D HTML overlay labels with strict unique DOM IDs
-    const create2DLabel = (id, text, color) => {
-        // Clear old ones if setup re-runs to avoid stacking duplicates
-        const oldEl = document.getElementById(id);
-        if (oldEl) oldEl.remove();
-
-        const el = document.createElement('div');
-        el.id = id;
-        el.innerText = text;
-        el.style.position = 'absolute';
-        el.style.color = color;
-        el.style.fontFamily = 'Arial, sans-serif';
-        el.style.fontWeight = 'bold';
-        el.style.fontSize = '10px'; 
-        el.style.pointerEvents = 'none';
-        el.style.transform = 'translate(-50%, -50%)'; // Perfect centering alignment
-        compassContainer.appendChild(el);
-        return el;
-    };
-
-    create2DLabel('compass-lbl-x', 'X', '#888888');
-    create2DLabel('compass-lbl-y', 'Y', '#888888');
-    create2DLabel('compass-lbl-z', 'Z', '#888888');
-
-    // Define the local 3D endpoints of your 25-unit axes lines
-    const endpointX = new THREE.Vector3(15, 0, 0);   // was 25
-    const endpointY = new THREE.Vector3(0, 15, 0);   // was 25
-    const endpointZ = new THREE.Vector3(0, 0, 15);   // was 25
-    */
-
     const compassAxes = new THREE.AxesHelper(20);
     compassAxes.rotation.x = -Math.PI / 2;
 
     // 🎨 OVERRIDE COMPASS LINE COLORS
-    // Three.js stores the color attributes inside geometry.attributes.color
     const colors = compassAxes.geometry.attributes.color;
     
-    // Line 1 (X-Axis): Set both vertices to Muted Red
-    colors.setXYZ(0, 0.8, 0.32, 0.32); // Start point (R, G, B normalization of 0xcc5252)
-    colors.setXYZ(1, 0.8, 0.32, 0.32); // End point
+    // Line 1 (X-Axis): Muted Red
+    colors.setXYZ(0, 0.8, 0.32, 0.32); 
+    colors.setXYZ(1, 0.8, 0.32, 0.32); 
 
-    // Line 2 (Y-Axis): Set both vertices to Muted Green
-    colors.setXYZ(2, 0.32, 0.8, 0.48); // Start point (R, G, B normalization of 0x52cc7a)
-    colors.setXYZ(3, 0.32, 0.8, 0.48); // End point
+    // Line 2 (Y-Axis): Muted Green
+    colors.setXYZ(2, 0.32, 0.8, 0.48); 
+    colors.setXYZ(3, 0.32, 0.8, 0.48); 
 
-    // Line 3 (Z-Axis): Set both vertices to Muted Slate Blue
-    colors.setXYZ(4, 0.0, 0.48, 0.8);  // Start point (R, G, B normalization of 0x007acc)
-    colors.setXYZ(5, 0.0, 0.48, 0.8);  // End point
+    // Line 3 (Z-Axis): Muted Slate Blue
+    colors.setXYZ(4, 0.0, 0.48, 0.8);  
+    colors.setXYZ(5, 0.0, 0.48, 0.8);  
 
-    colors.needsUpdate = true; // Tell the GPU to update the line colors
+    colors.needsUpdate = true; 
 
     compassScene.add(compassAxes);
 
@@ -1096,15 +1020,9 @@ function init3DWorkspace() {
         return el;
     };
 
-    // Kept as your uniform gray!
     create2DLabel('compass-lbl-x', 'X', '#888888');
     create2DLabel('compass-lbl-y', 'Y', '#888888');
     create2DLabel('compass-lbl-z', 'Z', '#888888');
-
-    // Local 3D endpoints for the animation script tracking parameters
-    const endpointX = new THREE.Vector3(15, 0, 0);   
-    const endpointY = new THREE.Vector3(0, 15, 0);   
-    const endpointZ = new THREE.Vector3(0, 0, 15);    
 
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.55); 
     scene.add(ambientLight);
@@ -1122,65 +1040,61 @@ function init3DWorkspace() {
     camera.add(headlight); 
     scene.add(camera); 
     
-function animate() {
-    requestAnimationFrame(animate);
-    
-    const cw = container.clientWidth;
-    const ch = container.clientHeight;
-    
-    const currentSize = new THREE.Vector2();
-    renderer.getSize(currentSize);
-    
-    if (cw > 0 && ch > 0 && (currentSize.x !== cw || currentSize.y !== ch)) {
-        camera.aspect = cw / ch;
-        camera.updateProjectionMatrix();
-        renderer.setSize(cw, ch, true);
-    }
-
-    controls.update();
-    renderer.render(scene, camera);
-
-    if (compassCamera && compassRenderer) {
-        compassCamera.position.copy(camera.position);
-        compassCamera.position.sub(controls.target); 
-        compassCamera.position.setLength(60); 
-        compassCamera.lookAt(0, 0, 0);
+    function animate() {
+        requestAnimationFrame(animate);
         
-        compassRenderer.render(compassScene, compassCamera);
+        const cw = container.clientWidth;
+        const ch = container.clientHeight;
+        
+        const currentSize = new THREE.Vector2();
+        renderer.getSize(currentSize);
+        
+        if (cw > 0 && ch > 0 && (currentSize.x !== cw || currentSize.y !== ch)) {
+            camera.aspect = cw / ch;
+            camera.updateProjectionMatrix();
+            renderer.setSize(cw, ch, true);
+        }
 
-        // 🔄 Safe, isolated 2D Label Updates
-        // By checking if the actual DOM element exists, your engine will never crash.
-        const xEl = document.getElementById('compass-lbl-x');
-        const yEl = document.getElementById('compass-lbl-y');
-        const zEl = document.getElementById('compass-lbl-z');
+        controls.update();
+        renderer.render(scene, camera);
 
-        if (xEl && yEl && zEl && compassAxes) {
-            const width = 80;
-            const height = 80;
-            const tempV = new THREE.Vector3();
+        if (compassCamera && compassRenderer) {
+            compassCamera.position.copy(camera.position);
+            compassCamera.position.sub(controls.target); 
+            compassCamera.position.setLength(60); 
+            compassCamera.lookAt(0, 0, 0);
+            
+            compassRenderer.render(compassScene, compassCamera);
 
-            compassScene.updateMatrixWorld(true);
+            // 🔄 Safe, isolated 2D Label Updates
+            const xEl = document.getElementById('compass-lbl-x');
+            const yEl = document.getElementById('compass-lbl-y');
+            const zEl = document.getElementById('compass-lbl-z');
 
-            const updateLabelPosition = (element, x3d, y3d, z3d) => {
-                // Set coordinate, apply world transform, project to screen
-                tempV.set(x3d, y3d, z3d).applyMatrix4(compassAxes.matrixWorld);
-                tempV.project(compassCamera);
-                
-                // Map to 80x80px bounding DIV pixels
-                const pixelX = (tempV.x * 0.5 + 0.5) * width;
-                const pixelY = (-tempV.y * 0.5 + 0.5) * height;
-                
-                element.style.left = `${pixelX}px`;
-                element.style.top = `${pixelY}px`;
-            };
+            if (xEl && yEl && zEl && compassAxes) {
+                const width = 80;
+                const height = 80;
+                const tempV = new THREE.Vector3();
 
-            // Calculate endpoints natively on the fly
-            updateLabelPosition(xEl, 25, 0, 0);
-            updateLabelPosition(yEl, 0, 25, 0);
-            updateLabelPosition(zEl, 0, 0, 25);
+                compassScene.updateMatrixWorld(true);
+
+                const updateLabelPosition = (element, x3d, y3d, z3d) => {
+                    tempV.set(x3d, y3d, z3d).applyMatrix4(compassAxes.matrixWorld);
+                    tempV.project(compassCamera);
+                    
+                    const pixelX = (tempV.x * 0.5 + 0.5) * width;
+                    const pixelY = (-tempV.y * 0.5 + 0.5) * height;
+                    
+                    element.style.left = `${pixelX}px`;
+                    element.style.top = `${pixelY}px`;
+                };
+
+                updateLabelPosition(xEl, 15, 0, 0);
+                updateLabelPosition(yEl, 0, 15, 0);
+                updateLabelPosition(zEl, 0, 0, 15);
+            }
         }
     }
-}
     animate();
 }
 
@@ -1277,6 +1191,8 @@ btnWireframe.style.background = '#007acc';
 const btnSettings = document.getElementById('btn-settings');
 const btnCloseSettings = document.getElementById('btn-close-settings');
 const settingsOverlay = document.getElementById('settings-overlay');
+const btnToggleGrid = document.getElementById('btn-toggle-grid');
+const btnToggleAxes = document.getElementById('btn-toggle-axes');
 
 function openSettingsMenu() {
     if (settingsOverlay) {
@@ -1310,6 +1226,27 @@ window.addEventListener('keydown', (event) => {
         closeSettingsMenu();
     }
 });
+
+// UI Event logic for toggling the Grid and Axes lines
+if (btnToggleGrid) {
+    btnToggleGrid.addEventListener('click', () => {
+        if (gridHelper) {
+            gridHelper.visible = !gridHelper.visible;
+            btnToggleGrid.innerText = gridHelper.visible ? 'Visible' : 'Hidden';
+            btnToggleGrid.style.backgroundColor = gridHelper.visible ? '#28a745' : '#dc3545';
+        }
+    });
+}
+
+if (btnToggleAxes) {
+    btnToggleAxes.addEventListener('click', () => {
+        if (axesGroup) {
+            axesGroup.visible = !axesGroup.visible;
+            btnToggleAxes.innerText = axesGroup.visible ? 'Visible' : 'Hidden';
+            btnToggleAxes.style.backgroundColor = axesGroup.visible ? '#28a745' : '#dc3545';
+        }
+    });
+}
 
 if (projectNameInput) {
     projectNameInput.addEventListener('input', (event) => {
@@ -1411,29 +1348,4 @@ if (leftPaneContainer && panelSplitGutter) {
         document.addEventListener('mousemove', onMouseMove);
         document.addEventListener('mouseup', onMouseUp);
     });
-}
-
-function createCompassLabel(text, color) {
-    const canvas = document.createElement('canvas');
-    canvas.width = 64;
-    canvas.height = 64;
-    const ctx = canvas.getContext('2d');
-
-    // Render bold, clean letters
-    ctx.font = 'Bold 90px Arial, sans-serif';
-    ctx.fillStyle = color;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(text, 32, 32);
-
-    const texture = new THREE.CanvasTexture(canvas);
-    const material = new THREE.SpriteMaterial({ 
-        map: texture, 
-        transparent: true,
-        depthTest: false // Ensures letters sit proudly on top of the thin lines
-    });
-    
-    const sprite = new THREE.Sprite(material);
-    sprite.scale.set(4.5, 4.5, 1); // Perfect scaling size for a length-25 helper
-    return sprite;
 }
