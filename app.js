@@ -466,13 +466,30 @@ const lineNumbersDiv = document.getElementById('line-numbers');
 let triggerLineUpdate = null;
 
 if (editorElement && lineNumbersDiv && toggleLinesBtn) {
+
+    /*
     const updateLineNumbers = (codeText) => {
         const currentCode = (typeof codeText === 'string') ? codeText : jar.toString();
         const linesCount = currentCode.split('\n').length;
         const linesArray = Array.from({ length: linesCount }, (_, i) => i + 1);
         lineNumbersDiv.innerHTML = linesArray.join('<br>');
     };
+    */
 
+    const updateLineNumbers = (codeText) => {
+        let currentCode = (typeof codeText === 'string') ? codeText : jar.toString();
+        
+        // 🔥 FIXED: If the code ends with a single trailing newline, strip it out 
+        // so `.split('\n')` doesn't generate a phantom empty line at the end.
+        if (currentCode.endsWith('\n')) {
+            currentCode = currentCode.slice(0, -1);
+        }
+
+        const linesCount = currentCode.split('\n').length;
+        const linesArray = Array.from({ length: linesCount }, (_, i) => i + 1);
+        lineNumbersDiv.innerHTML = linesArray.join('<br>');
+    };
+    
     triggerLineUpdate = updateLineNumbers;
 
     jar.onUpdate((code) => {
