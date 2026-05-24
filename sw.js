@@ -27,6 +27,11 @@ const ASSETS_TO_CACHE = [
   './libs/openscad.js',
   './libs/openscad.wasm.js',
   './libs/openscad.wasm',
+
+  // 📴 NEW STANDALONE HIGHLIGHTING PIPELINE ASSETS:
+  './libs/prism-tomorrow.min.css',
+  './libs/prism.min.js',
+  './libs/codejar.min.js'
   
   // Your local typography suite
   './fonts/LiberationSans-Regular.ttf',
