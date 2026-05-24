@@ -952,18 +952,25 @@ function init3DWorkspace() {
     */
 
 
-    // 1. Uniform gray grid sitting squarely at 0
+// 1. Setup the main grid helper with a small polygon offset to prevent z-fighting
     const gridHelper = new THREE.GridHelper(400, 40, 0x444444, 0x444444);
     gridHelper.position.y = 0;  
+    gridHelper.material.polygonOffset = true;
+    gridHelper.material.polygonOffsetFactor = 1;
+    gridHelper.material.polygonOffsetUnits = 1;
     scene.add(gridHelper);
 
     const gridHalfSize = 200;
 
-    // A shared configuration that forces lines to stay crisp and overlay the grid
+    // 2. Updated configuration: Turn depthTest BACK ON, but give lines a slightly 
+    // better offset priority than the grid helper so they render crisply on top of it.
     const overlayConfig = (colorHex) => ({
         color: colorHex,
-        depthTest: false, // Prevents lines from cutting into the grid structure
-        transparent: true // Required in Three.js for depthTest overrides to cooperate cleanly
+        depthTest: true,           // 👈 Crucial: Re-enable so models block the lines!
+        transparent: true,
+        polygonOffset: true,
+        polygonOffsetFactor = 0.5, // 👈 Sits slightly "in front" of the grid helper's 1.0
+        polygonOffsetUnits = 0.5
     });
 
     // --- Red X-Axis Line ---
@@ -972,7 +979,6 @@ function init3DWorkspace() {
         new THREE.Vector3(gridHalfSize, 0, 0)
     ]);
     const xAxisLine = new THREE.Line(xGeometry, new THREE.LineBasicMaterial(overlayConfig(0xcc5252)));
-    xAxisLine.renderOrder = 1; // Higher renderOrder draws it AFTER the grid helper
     scene.add(xAxisLine);
 
     // --- Green Y-Axis Line ---
@@ -981,7 +987,6 @@ function init3DWorkspace() {
         new THREE.Vector3(0, 0, gridHalfSize)
     ]);
     const yAxisLine = new THREE.Line(yGeometry, new THREE.LineBasicMaterial(overlayConfig(0x52cc7a)));
-    yAxisLine.renderOrder = 1;
     scene.add(yAxisLine);
 
     // --- Blue Z-Axis Line ---
@@ -990,7 +995,6 @@ function init3DWorkspace() {
         new THREE.Vector3(0, gridHalfSize, 0)
     ]);
     const zAxisLine = new THREE.Line(zGeometry, new THREE.LineBasicMaterial(overlayConfig(0x007acc)));
-    zAxisLine.renderOrder = 1;
     scene.add(zAxisLine);
     
 
@@ -1016,6 +1020,7 @@ function init3DWorkspace() {
     compassRenderer.setPixelRatio(window.devicePixelRatio);
     compassContainer.appendChild(compassRenderer.domElement);
 
+    /*
     const compassAxes = new THREE.AxesHelper(20);
     compassAxes.rotation.x = -Math.PI / 2;
     compassScene.add(compassAxes);
@@ -1048,6 +1053,59 @@ function init3DWorkspace() {
     const endpointX = new THREE.Vector3(15, 0, 0);   // was 25
     const endpointY = new THREE.Vector3(0, 15, 0);   // was 25
     const endpointZ = new THREE.Vector3(0, 0, 15);   // was 25
+    */
+
+    const compassAxes = new THREE.AxesHelper(20);
+    compassAxes.rotation.x = -Math.PI / 2;
+
+    // 🎨 OVERRIDE COMPASS LINE COLORS
+    // Three.js stores the color attributes inside geometry.attributes.color
+    const colors = compassAxes.geometry.attributes.color;
+    
+    // Line 1 (X-Axis): Set both vertices to Muted Red
+    colors.setXYZ(0, 0.8, 0.32, 0.32); // Start point (R, G, B normalization of 0xcc5252)
+    colors.setXYZ(1, 0.8, 0.32, 0.32); // End point
+
+    // Line 2 (Y-Axis): Set both vertices to Muted Green
+    colors.setXYZ(2, 0.32, 0.8, 0.48); // Start point (R, G, B normalization of 0x52cc7a)
+    colors.setXYZ(3, 0.32, 0.8, 0.48); // End point
+
+    // Line 3 (Z-Axis): Set both vertices to Muted Slate Blue
+    colors.setXYZ(4, 0.0, 0.48, 0.8);  // Start point (R, G, B normalization of 0x007acc)
+    colors.setXYZ(5, 0.0, 0.48, 0.8);  // End point
+
+    colors.needsUpdate = true; // Tell the GPU to update the line colors
+
+    compassScene.add(compassAxes);
+
+    // 🏷️ Create 2D HTML overlay labels with strict unique DOM IDs
+    const create2DLabel = (id, text, color) => {
+        const oldEl = document.getElementById(id);
+        if (oldEl) oldEl.remove();
+
+        const el = document.createElement('div');
+        el.id = id;
+        el.innerText = text;
+        el.style.position = 'absolute';
+        el.style.color = color;
+        el.style.fontFamily = 'Arial, sans-serif';
+        el.style.fontWeight = 'bold';
+        el.style.fontSize = '10px'; 
+        el.style.pointerEvents = 'none';
+        el.style.transform = 'translate(-50%, -50%)';
+        compassContainer.appendChild(el);
+        return el;
+    };
+
+    // Kept as your uniform gray!
+    create2DLabel('compass-lbl-x', 'X', '#888888');
+    create2DLabel('compass-lbl-y', 'Y', '#888888');
+    create2DLabel('compass-lbl-z', 'Z', '#888888');
+
+    // Local 3D endpoints for the animation script tracking parameters
+    const endpointX = new THREE.Vector3(15, 0, 0);   
+    const endpointY = new THREE.Vector3(0, 15, 0);   
+    const endpointZ = new THREE.Vector3(0, 0, 15);    
 
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.55); 
     scene.add(ambientLight);
