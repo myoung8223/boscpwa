@@ -14,10 +14,10 @@ Basic OpenSCAD PWA is a lightweight, browser-optimized Progressive Web App (PWA)
 
 ## Improvements and Features to Add
 
-- [ ] **Improve 3D Lighting and Model Texturing:** Right now the lighting needs improvement and texturing the models would improve the preview.
+- [x] **Improve 3D Lighting and Model Texturing:** Right now the lighting needs improvement and texturing the models would improve the preview.
 - [x] **Adjustable Editor Font Size:** An adjustable, and persistant font size for the editor would be welcome.
 - [x] **Address Editor Word Wrap:** Word wrap needs to be disabled or made to be a configurable setting.
-- [ ] **Add Optional Line Numbers:** Optional line numbers in the editor would be a welcome feature.
+- [x] **Add Optional Line Numbers:** Optional line numbers in the editor would be a welcome feature.
 - [x] **Adjustable Editor/Preview Port Framing:** An adjustable, and persistant editor/preview port framing is needed.
 - [x] **Toggle for Console:** Add a toggle to hide/show the console.
 - [ ] **Link to OpenSCAD Cheat Sheet:** The ability to pop-up the super handy OpenSCAD cheat sheet would be a nice feature to add.
@@ -26,8 +26,10 @@ Basic OpenSCAD PWA is a lightweight, browser-optimized Progressive Web App (PWA)
 - [ ] **Orthogonal Projection:** Add a button for toggling between perspective and orthogonal 3D projection.
 - [ ] **Camera Movement Improvements:** Improve the camera movement, perhaps with translation accelleration.
 - [ ] **Improve PWA Icon:** The icon is a little dark. It could use a snazzier icon.
-- [ ] **Improve Error Highlighting:** While there's basic error highlighting now, that should be refined further.
+- [x] **Improve Error Highlighting:** While there's basic error highlighting now, that should be refined further.
 - [x] **Project Name Field:** Add a project name field so saved .scad files will have that for the filename.
+- [x] **Replace textarea with CodeJar:** Replace textarea with CodeJar for syntax highlighting and block character matching.
+- [x] **Add a Settings Menu:** Add a settings menu to declutter the core interface.
 
 ## Getting Started
 
