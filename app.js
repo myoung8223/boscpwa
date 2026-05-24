@@ -1,5 +1,5 @@
 // ---- BUILD VERSION CONTROLLER ----
-const BUILD_NUMBER = "58"; // <-- Increment this number whenever you commit!
+const BUILD_NUMBER = "59"; // <-- Increment this number whenever you commit!
 
 // 🍯 Import standalone, offline-ready CodeJar framework
 import { CodeJar } from './libs/codejar.min.js';
@@ -23,7 +23,10 @@ const btnColorTrigger = document.getElementById('btn-color-trigger');
 // 🍯 INITIALIZE CODEJAR INSTANCE
 // Connects the text listener module to global Prism syntax coloring
 const jar = CodeJar(editorElement, (el) => {
-    Prism.highlightElement(el);
+    // This hook runs on every keystroke, forcing Prism to scan the text tokens
+    if (typeof Prism !== 'undefined') {
+        Prism.highlightElement(el);
+    }
 });
 
 // ==========================================================================
