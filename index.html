@@ -124,7 +124,11 @@
             line-height: 1.5;
             tab-size: 4;
             -moz-tab-size: 4; 
-            white-space: pre;
+            
+            /* 🔥 FIXED: Forcefully overrides CodeJar's internal inline 'pre-wrap' style injection! */
+            white-space: pre !important;
+            word-break: normal !important;
+            overflow-wrap: normal !important;
         }
 
         /* 🤖 FIXED: Cleaned child-combinator rules to preserve full JS settings compatibility */
@@ -132,6 +136,7 @@
         .codejar-editor, 
         .codejar-editor * {
             font-family: 'Consolas', 'Monaco', 'Courier New', Courier, monospace !important; 
+            line-height: 1.5 !important; /* 🔥 ARMORED: Prevents Prism spans from shifting lines vertically */
             /* Font-size !important was removed here so your active UI settings scaling menu can work! */
         }
         
