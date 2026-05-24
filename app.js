@@ -1,5 +1,5 @@
 // ---- BUILD VERSION CONTROLLER ----
-const BUILD_NUMBER = "60"; // <-- Increment this number whenever you commit!
+const BUILD_NUMBER = "61"; // <-- Incremented this number for your new build!
 
 // 🍯 Import standalone, offline-ready CodeJar framework
 import { CodeJar } from './libs/codejar.min.js';
@@ -19,17 +19,6 @@ const projectNameInput = document.getElementById('project-name-input');
 const editorFontSizeSelect = document.getElementById('editor-font-size-select');
 const modelColorInput = document.getElementById('model-color');
 const btnColorTrigger = document.getElementById('btn-color-trigger');
-
-/*
-// 🍯 INITIALIZE CODEJAR INSTANCE
-// Connects the text listener module to global Prism syntax coloring
-const jar = CodeJar(editorElement, (el) => {
-    // This hook runs on every keystroke, forcing Prism to scan the text tokens
-    if (typeof Prism !== 'undefined') {
-        Prism.highlightElement(el);
-    }
-});
-*/
 
 // 🍯 INITIALIZE CODEJAR INSTANCE
 // Connects the text listener module to global Prism syntax coloring and matches brackets
@@ -52,17 +41,22 @@ const jar = CodeJar(
         tab: '\t',
         history: true,
         indentOn: /^\s*$/,
-        // 🛑 THE ULTIMATE AUTOCOMPLETE KILL SWITCH:
-        // By passing a RegExp that can never logically match anything, 
-        // CodeJar will never auto-close another bracket or parenthesis!
-        open: /$^/,
-        close: /$^/,
-        moveTo: /$^/
+        addClosing: false // 🛑 THE OFFICIAL KILL SWITCH: Disables CodeJar's auto-bracket closing natively!
     } 
 );
 
+// 🖱️ Re-scan brackets instantly when clicking or navigating with arrow keys
+if (editorElement) {
+    editorElement.addEventListener('click', () => applyInlineBracketMatching(editorElement));
+    editorElement.addEventListener('keyup', (e) => {
+        if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Home', 'End', 'PageUp', 'PageDown'].includes(e.key)) {
+            applyInlineBracketMatching(editorElement);
+        }
+    });
+}
+
 // ==========================================================================
-// 💡 UPGRADED: BI-DIRECTIONAL CODEJAR BRACKET MATCHING ENGINE (FIX ISSUE 2)
+// 💡 UPGRADED: BI-DIRECTIONAL CODEJAR BRACKET MATCHING ENGINE 
 // ==========================================================================
 function applyInlineBracketMatching(editorDiv) {
     // Clear any previous bracket highlights from the last keystroke
@@ -164,7 +158,6 @@ function applyInlineBracketMatching(editorDiv) {
         }
     }
 }
-
 
 // ==========================================================================
 // 🖥️ PERSISTENT CONSOLE VISIBILITY TOGGLE
