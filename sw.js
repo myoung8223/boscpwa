@@ -31,7 +31,7 @@ const ASSETS_TO_CACHE = [
   // 📴 NEW STANDALONE HIGHLIGHTING PIPELINE ASSETS:
   './libs/prism-tomorrow.min.css',
   './libs/prism.min.js',
-  './libs/codejar.min.js'
+  './libs/codejar.min.js',
   
   // Your local typography suite
   './fonts/LiberationSans-Regular.ttf',
