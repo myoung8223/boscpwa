@@ -1089,9 +1089,9 @@ function init3DWorkspace() {
                     element.style.top = `${pixelY}px`;
                 };
 
-                updateLabelPosition(xEl, 15, 0, 0);
-                updateLabelPosition(yEl, 0, 15, 0);
-                updateLabelPosition(zEl, 0, 0, 15);
+                updateLabelPosition(xEl, 25, 0, 0);
+                updateLabelPosition(yEl, 0, 25, 0);
+                updateLabelPosition(zEl, 0, 0, 25);
             }
         }
     }
