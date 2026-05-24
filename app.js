@@ -45,6 +45,7 @@ if (editorElement) {
 // ==========================================================================
 if (editorElement) {
     editorElement.addEventListener('keydown', (event) => {
+        // Only run our deep interception calculations if the user is pressing Tab
         if (event.key === 'Tab') {
             
             event.preventDefault();
