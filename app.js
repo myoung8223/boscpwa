@@ -347,7 +347,7 @@ function applyInlineBracketMatching(editorDiv) {
 // ==========================================================================
 // 🖥️ PERSISTENT CONSOLE VISIBILITY TOGGLE
 // ==========================================================================
-const consoleBox = document.getElementById('console');
+//const consoleBox = document.getElementById('console');
 const toggleConsoleBtn = document.getElementById('btn-toggle-console');
 
 if (consoleBox && toggleConsoleBtn) {
