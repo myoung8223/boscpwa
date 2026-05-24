@@ -24,7 +24,7 @@ The core purpose of this project is to make OpenSCAD design fully accessible on 
 
 ## Improvements and Features to Add
 
-- [ ] **Adjustable Axes and Grid:** Additional controls for the axes and grid would be handy, possibly even tick marks and numerical labels.
+- [x] **Adjustable Axes and Grid:** Additional controls for the axes and grid would be handy, possibly even tick marks and numerical labels.
 - [x] **Replace textarea with CodeJar:** Replace textarea with CodeJar for syntax highlighting and block character matching.
 - [x] **Improve 3D Lighting and Model Texturing:** Right now the lighting needs improvement and texturing the models would improve the preview.
 - [ ] **Camera Movement Improvements:** Improve the camera movement, perhaps with translation accelleration.
