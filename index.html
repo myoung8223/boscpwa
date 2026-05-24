@@ -18,6 +18,9 @@
     <script src="libs/three.min.js"></script>
     <script src="libs/STLLoader.js"></script>
     <script src="libs/OrbitControls.js"></script>
+    
+    <link rel="stylesheet" href="libs/prism-tomorrow.min.css">
+    
     <script type="module" src="app.js"></script>
     
 <style>
@@ -27,10 +30,10 @@
         /* Two-column layout */
         .app-container { display: flex; height: 100vh; width: 100vw; }
         
-        /* 📐 MODIFIED: Set a base fallback width; JS will handle the persistence on initialization */
+        /* 📐 Set a base fallback width; JS will handle the persistence on initialization */
         .left-panel { width: 50%; min-width: 15%; max-width: 85%; display: flex; flex-direction: column; }
 
-        /* 🎛️ NEW: Draggable splitter style rules */
+        /* 🎛️ Draggable splitter style rules */
         .split-gutter {
             width: 8px;
             background: #111;
@@ -47,7 +50,7 @@
             background: #007acc; /* Highlights active blue when dragging */
         }
 
-        /* 📐 MODIFIED: Removed static width and forced panel to fill remaining viewport territory */
+        /* 📐 Removed static width and forced panel to fill remaining viewport territory */
         .right-panel { 
             flex-grow: 1;
             height: 100vh; 
@@ -66,7 +69,7 @@
         .file-btn { background: #444; }
         .file-btn:hover { background: #555; }
         
-        /* 🔣 NEW: Line number parent container wrapper */
+        /* 🔣 Line number parent container wrapper */
         .editor-wrapper {
             flex-grow: 1;      /* Replaces the old textarea flex-grow to stretch down to the console */
             display: flex;
@@ -75,44 +78,47 @@
             position: relative;
         }
 
-        /* 🔣 NEW: The line number sidebar element track */
+        /* 🔣 The line number sidebar element track */
         #line-numbers {
             width: 55px;
             background: #1a1a1a;
             color: #5a5a5a;
             text-align: right;
-            padding: 15px 8px 15px 0; /* Matches your textarea padding exactly */
-            font-family: 'Courier New', Courier, monospace; /* Matches textarea font */
-            font-size: 14px;           /* Matches textarea font-size */
-            line-height: 1.5;          /* Matches textarea line-height */
+            padding: 15px 8px 15px 0; 
+            font-family: 'Courier New', Courier, monospace; 
+            font-size: 14px;           
+            line-height: 1.5;          
             user-select: none;         /* Disables highlighting numbers while selecting code */
             overflow: hidden;          /* Disables double scroll bars */
             border-right: 1px solid #2d2d2d;
+            flex-shrink: 0;            /* Forces line track to maintain shape */
         }
         
-        /* 📐 MODIFIED: Cleaned up layout dependencies for textarea */
-        textarea { 
+        /* 📐 NEW: CodeJar CSS Overrides replacing the old textarea style element */
+        #editor { 
             flex-grow: 1; 
-            height: 100%;             /* Fills the height of the .editor-wrapper parent container */
+            height: 100%;             
             background: #1e1e1e; 
-            color: #d4d4d4; 
-            font-family: 'Courier New', Courier, monospace; 
-            font-size: 14px; 
-            padding: 15px; 
-            border: none; 
-            resize: none; 
-            outline: none; 
-            line-height: 1.5; 
+            position: relative;
+            overflow: auto;
+        }
+
+        /* Target the internal canvas engine properties built by CodeJar */
+        .codejar-editor {
+            font-family: 'Courier New', Courier, monospace !important; 
+            font-size: 14px !important; 
+            line-height: 1.5 !important;  
             tab-size: 4;
             -moz-tab-size: 4; 
-            white-space: pre;
-            overflow-x: auto;
+            white-space: pre !important;
+            outline: none;
+            padding: 15px !important; /* Perfect match for layout calculations */
         }
         
         /* Console Output Box */
         .console-box { height: 150px; background: #000; border-top: 2px solid #444; font-family: monospace; font-size: 13px; color: #0f0; padding: 10px; overflow-y: auto; white-space: pre-wrap; }
         
-        /* 2. TARGET VIEWPORT PANEL FRAMING */
+        /* TARGET VIEWPORT PANEL FRAMING */
         #viewer-3d { 
             position: absolute;
             top: 0;
@@ -215,7 +221,7 @@
             
             <div class="editor-wrapper">
                 <div id="line-numbers">1</div>
-                <textarea id="editor" spellcheck="false"></textarea>
+                <div id="editor" class="language-scad" spellcheck="false"></div>
             </div>
             
             <div class="console-box" id="console">Basic OpenSCAD PWA - By: Mike Young</div>
@@ -284,6 +290,6 @@
         </div>
     </div>
 
-    <script src="app.js"></script>
+    <script src="libs/prism.min.js"></script>
 </body>
 </html>
