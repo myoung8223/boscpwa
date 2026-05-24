@@ -1,5 +1,5 @@
 // ---- BUILD VERSION CONTROLLER ----
-const BUILD_NUMBER = "60"; // <-- Increment this number whenever you commit!
+const BUILD_NUMBER = "64"; // <-- Incremented for Event Capture Phase Interceptor!
 
 // 🍯 Import standalone, offline-ready CodeJar framework
 import { CodeJar } from './libs/codejar.min.js';
@@ -20,52 +20,191 @@ const editorFontSizeSelect = document.getElementById('editor-font-size-select');
 const modelColorInput = document.getElementById('model-color');
 const btnColorTrigger = document.getElementById('btn-color-trigger');
 
-/*
 // 🍯 INITIALIZE CODEJAR INSTANCE
-// Connects the text listener module to global Prism syntax coloring
-const jar = CodeJar(editorElement, (el) => {
-    // This hook runs on every keystroke, forcing Prism to scan the text tokens
-    if (typeof Prism !== 'undefined') {
-        Prism.highlightElement(el);
-    }
-});
-*/
-
-// 🍯 INITIALIZE CODEJAR INSTANCE
-// Connects the text listener module to global Prism syntax coloring and matches brackets
 const jar = CodeJar(
     editorElement, 
     (el) => {
-        // 1. Run Prism to color the keywords first
-        if (typeof Prism !== 'undefined') {
-            Prism.highlightElement(el);
-        }
-        
-        // 2. Safely run our upgraded native text cursor bracket matching pass
-        try {
-            applyInlineBracketMatching(el);
-        } catch (e) {
-            console.error("Bracket matching engine error:", e);
-        }
+        if (typeof Prism !== 'undefined') Prism.highlightElement(el);
+        try { applyInlineBracketMatching(el); } catch (e) { console.error("Bracket match error:", e); }
     },
-    { 
-        tab: '\t',
-        history: true,
-        indentOn: /^\s*$/,
-        // 🛑 THE ULTIMATE AUTOCOMPLETE KILL SWITCH:
-        // By passing a RegExp that can never logically match anything, 
-        // CodeJar will never auto-close another bracket or parenthesis!
-        open: /$^/,
-        close: /$^/,
-        moveTo: /$^/
-    } 
+    { tab: '\t', history: true, indentOn: /^\s*$/, addClosing: false } 
 );
 
+// 🖱️ Passive navigation listeners
+if (editorElement) {
+    editorElement.addEventListener('click', () => applyInlineBracketMatching(editorElement));
+    editorElement.addEventListener('keyup', (e) => {
+        if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Home', 'End', 'PageUp', 'PageDown'].includes(e.key)) {
+            applyInlineBracketMatching(editorElement);
+        }
+    });
+}
+
 // ==========================================================================
-// 💡 UPGRADED: BI-DIRECTIONAL CODEJAR BRACKET MATCHING ENGINE (FIX ISSUE 2)
+// 📐 SMART MULTI-LINE BLOCK INDENTATION ENGINE (CAPTURE-PHASE INTERCEPTOR)
+// ==========================================================================
+if (editorElement) {
+    // 🚨 IMPORTANT: 'true' as the 3rd argument runs this listener in the DOM Capture Phase!
+    // This guarantees we process the Tab key BEFORE CodeJar's internal engine even sees it.
+    editorElement.addEventListener('keydown', (event) => {
+        if (event.key === 'Tab') {
+            
+            // 🛑 Blindfold CodeJar completely for this keystroke
+            event.preventDefault();
+            event.stopImmediatePropagation();
+
+            let { start, end } = getSelectionCharacterOffsetWithin(editorElement);
+            const value = jar.toString();
+
+            // SCENARIO 1: Standard single-cursor inline Tab insertion
+            if (start === end && !event.shiftKey) {
+                const newCode = value.substring(0, start) + '\t' + value.substring(end);
+                jar.updateCode(newCode);
+                setSelectionCharacterOffsetWithin(editorElement, start + 1, start + 1);
+                return;
+            }
+
+            // SCENARIO 2: Multi-line Block Indent OR Shift+Tab Outdent
+            // Edge Case Fix: If highlight perfectly catches the trailing return, don't indent the line beneath it
+            let adjustedEnd = end;
+            if (adjustedEnd > start && value[adjustedEnd - 1] === '\n') {
+                adjustedEnd--;
+            }
+
+            const selectStartLineStart = value.lastIndexOf('\n', start - 1) + 1;
+            const selectEndLineEnd = value.indexOf('\n', adjustedEnd);
+            const finalEndPos = selectEndLineEnd === -1 ? value.length : selectEndLineEnd;
+
+            const targetBlock = value.substring(selectStartLineStart, finalEndPos);
+            let modifiedBlock = "";
+            let newStart = start;
+            let newEnd = end;
+
+            if (!event.shiftKey) {
+                // -> Multi-line Indent: Add \t to the start of every selected line
+                modifiedBlock = targetBlock.split('\n').map(line => '\t' + line).join('\n');
+                
+                const linesBeforeStart = value.substring(selectStartLineStart, start).split('\n').length - 1;
+                const linesBeforeEnd = value.substring(selectStartLineStart, end).split('\n').length - 1;
+                
+                newStart = start + linesBeforeStart + 1;
+                newEnd = end + linesBeforeEnd + 1;
+            } else {
+                // -> Shift+Tab Outdent: Remove leading \t or up to 4 spaces from every selected line
+                let removedBeforeStart = 0;
+                let removedBeforeEnd = 0;
+                
+                const lines = targetBlock.split('\n');
+                let currentPosInBlock = 0;
+                
+                modifiedBlock = lines.map(line => {
+                    let reduction = 0;
+                    let newLine = line;
+                    
+                    if (line.startsWith('\t')) {
+                        reduction = 1;
+                        newLine = line.substring(1);
+                    } else if (line.startsWith('    ')) {
+                        reduction = 4;
+                        newLine = line.substring(4);
+                    }
+                    
+                    const absoluteLineStart = selectStartLineStart + currentPosInBlock;
+                    
+                    if (start > absoluteLineStart) removedBeforeStart += Math.min(reduction, start - absoluteLineStart);
+                    if (end > absoluteLineStart) removedBeforeEnd += Math.min(reduction, end - absoluteLineStart);
+                    
+                    currentPosInBlock += line.length + 1;
+                    return newLine;
+                }).join('\n');
+                
+                newStart = Math.max(selectStartLineStart, start - removedBeforeStart);
+                newEnd = Math.max(selectStartLineStart, end - removedBeforeEnd);
+            }
+
+            const newCode = value.substring(0, selectStartLineStart) + modifiedBlock + value.substring(finalEndPos);
+            
+            // Execute the update
+            jar.updateCode(newCode);
+            setSelectionCharacterOffsetWithin(editorElement, newStart, newEnd);
+        }
+    }, true); // <--- CRITICAL FIX: The 'true' flag establishes DOM dominance!
+}
+
+// Helper to convert complex multi-node DOM selection to clean absolute string indexes
+function getSelectionCharacterOffsetWithin(element) {
+    let start = 0, end = 0;
+    const sel = window.getSelection();
+    if (sel.rangeCount > 0) {
+        const range = sel.getRangeAt(0);
+        const preCaretRange = range.cloneRange();
+        preCaretRange.selectNodeContents(element);
+        
+        if (element.contains(range.startContainer)) {
+            preCaretRange.setEnd(range.startContainer, range.startOffset);
+            start = preCaretRange.toString().length;
+        }
+        if (element.contains(range.endContainer)) {
+            preCaretRange.setEnd(range.endContainer, range.endOffset);
+            end = preCaretRange.toString().length;
+        }
+        
+        if (start > end) { const temp = start; start = end; end = temp; }
+    }
+    return { start, end };
+}
+
+// Helper to map absolute text positions back to granular text container DOM nodes
+function setSelectionCharacterOffsetWithin(element, start, end) {
+    if (start < 0) start = 0;
+    if (end < 0) end = 0;
+    
+    const sel = window.getSelection();
+    const range = document.createRange();
+    range.setStart(element, 0);
+    range.collapse(true);
+    
+    let currentOffset = 0;
+    const treeWalker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+    let currentNode = treeWalker.nextNode();
+    
+    let startNode = null, startOffset = 0;
+    let endNode = null, endOffset = 0;
+    
+    while (currentNode) {
+        const nodeLength = currentNode.textContent.length;
+        
+        if (!startNode && currentOffset + nodeLength >= start) {
+            startNode = currentNode;
+            startOffset = start - currentOffset;
+        }
+        if (!endNode && currentOffset + nodeLength >= end) {
+            endNode = currentNode;
+            endOffset = end - currentOffset;
+            break;
+        }
+        
+        currentOffset += nodeLength;
+        currentNode = treeWalker.nextNode();
+    }
+    
+    if (!startNode) { startNode = element; startOffset = element.childNodes.length; }
+    if (!endNode) { endNode = element; endOffset = element.childNodes.length; }
+    
+    try {
+        range.setStart(startNode, startOffset);
+        range.setEnd(endNode, endOffset);
+        sel.removeAllRanges();
+        sel.addRange(range);
+    } catch (e) {
+        console.error("Selection recovery matrix execution failure:", e);
+    }
+}
+
+// ==========================================================================
+// 💡 BI-DIRECTIONAL CODEJAR BRACKET MATCHING ENGINE (LEXICAL-AWARE)
 // ==========================================================================
 function applyInlineBracketMatching(editorDiv) {
-    // Clear any previous bracket highlights from the last keystroke
     const oldHighlights = editorDiv.querySelectorAll('.bracket-match-glow, .bracket-mismatch-glow');
     oldHighlights.forEach(span => {
         span.classList.remove('bracket-match-glow', 'bracket-mismatch-glow');
@@ -77,7 +216,6 @@ function applyInlineBracketMatching(editorDiv) {
     const range = selection.getRangeAt(0);
     const textContent = editorDiv.textContent;
     
-    // Calculate character index deep within the text stream
     let cursorIndex = 0;
     const treeWalker = document.createTreeWalker(editorDiv, NodeFilter.SHOW_TEXT);
     let currentNode = treeWalker.nextNode();
@@ -93,7 +231,6 @@ function applyInlineBracketMatching(editorDiv) {
 
     const partners = { '{': '}', '}': '{', '[': ']', ']': '[', '(': ')', ')': '(' };
     
-    // 🧠 BI-DIRECTIONAL CHECK: Look right next to the cursor, then look slightly left
     let targetIndex = cursorIndex;
     let charToMatch = textContent[targetIndex];
     
@@ -102,8 +239,55 @@ function applyInlineBracketMatching(editorDiv) {
         charToMatch = textContent[targetIndex];
     }
     
-    // If neither side holds a valid structural bracket, step out smoothly
     if (!partners[charToMatch]) return;
+
+    // 🕵️‍♂️ LEXICAL STATE SCANNER: Pre-calculate non-code blind spots
+    const ignoredMap = new Array(textContent.length).fill(false);
+    let inSingleComment = false;
+    let inMultiComment = false;
+    let inString = false;
+
+    for (let i = 0; i < textContent.length; i++) {
+        if (inSingleComment) {
+            ignoredMap[i] = true;
+            if (textContent[i] === '\n') inSingleComment = false;
+        } else if (inMultiComment) {
+            ignoredMap[i] = true;
+            if (textContent[i] === '*' && textContent[i + 1] === '/') {
+                ignoredMap[i + 1] = true;
+                i++; // Advance past the closing '/'
+                inMultiComment = false;
+            }
+        } else if (inString) {
+            ignoredMap[i] = true;
+            // Handle escaped double quotes inside strings: \"
+            if (textContent[i] === '\\' && textContent[i + 1] === '"') {
+                ignoredMap[i + 1] = true;
+                i++;
+            } else if (textContent[i] === '"') {
+                inString = false;
+            }
+        } else {
+            // Check for entry boundaries
+            if (textContent[i] === '/' && textContent[i + 1] === '/') {
+                ignoredMap[i] = true;
+                ignoredMap[i + 1] = true;
+                i++;
+                inSingleComment = true;
+            } else if (textContent[i] === '/' && textContent[i + 1] === '*') {
+                ignoredMap[i] = true;
+                ignoredMap[i + 1] = true;
+                i++;
+                inMultiComment = true;
+            } else if (textContent[i] === '"') {
+                ignoredMap[i] = true;
+                inString = true;
+            }
+        }
+    }
+
+    // Safety abort: If the cursor itself is on a bracket inside a comment or string, ignore it!
+    if (ignoredMap[targetIndex]) return;
     
     const partnerChar = partners[charToMatch];
     const isForwardScan = ['{', '[', '('].includes(charToMatch);
@@ -111,9 +295,10 @@ function applyInlineBracketMatching(editorDiv) {
     let matchIndex = -1;
     let balanceCounter = 0;
 
-    // Scan the string vector for the balancing structural partner
     if (isForwardScan) {
         for (let i = targetIndex; i < textContent.length; i++) {
+            if (ignoredMap[i]) continue; // 🛑 Skip checking dead zones
+            
             if (textContent[i] === charToMatch) balanceCounter++;
             if (textContent[i] === partnerChar) balanceCounter--;
             if (balanceCounter === 0) {
@@ -123,6 +308,8 @@ function applyInlineBracketMatching(editorDiv) {
         }
     } else {
         for (let i = targetIndex; i >= 0; i--) {
+            if (ignoredMap[i]) continue; // 🛑 Skip checking dead zones
+            
             if (textContent[i] === charToMatch) balanceCounter++;
             if (textContent[i] === partnerChar) balanceCounter--;
             if (balanceCounter === 0) {
@@ -132,7 +319,6 @@ function applyInlineBracketMatching(editorDiv) {
         }
     }
 
-    // Identify and link onto the precise target elements inside the UI view tree
     let absoluteOffset = 0;
     let targetSpanNode = null;
     let matchSpanNode = null;
@@ -154,7 +340,6 @@ function applyInlineBracketMatching(editorDiv) {
         textNode = walker.nextNode();
     }
 
-    // Paint the elements using the application CSS layers
     if (targetSpanNode) {
         if (matchIndex !== -1 && matchSpanNode) {
             targetSpanNode.classList.add('bracket-match-glow');
@@ -172,33 +357,28 @@ function applyInlineBracketMatching(editorDiv) {
 const toggleConsoleBtn = document.getElementById('btn-toggle-console');
 
 if (consoleBox && toggleConsoleBtn) {
-    // 1. Read layout state from cache (default to 'visible' if never configured)
     let isConsoleVisible = localStorage.getItem('openscad_console_visible') !== 'hidden';
 
-    // 2. Define the layout application function inside the block
     const applyConsoleLayout = (visible) => {
         if (visible) {
             consoleBox.style.display = 'block';
             toggleConsoleBtn.textContent = 'Visible';
-            toggleConsoleBtn.style.backgroundColor = '#28a745'; // Balanced UI Green
+            toggleConsoleBtn.style.backgroundColor = '#28a745'; 
             isConsoleVisible = true;
             localStorage.setItem('openscad_console_visible', 'visible');
         } else {
             consoleBox.style.display = 'none';
             toggleConsoleBtn.textContent = 'Hidden';
-            toggleConsoleBtn.style.backgroundColor = '#dc3545'; // Attention Red
+            toggleConsoleBtn.style.backgroundColor = '#dc3545'; 
             isConsoleVisible = false;
             localStorage.setItem('openscad_console_visible', 'hidden');
         }
     };
 
-    // Initialize layout immediately on page bootup
     applyConsoleLayout(isConsoleVisible);
 
-    // 3. Click Listener: Put this INSIDE the conditional block!
     toggleConsoleBtn.addEventListener('click', () => {
         applyConsoleLayout(!isConsoleVisible);
-        
         if (isConsoleVisible && typeof logToConsole === 'function') {
             logToConsole("🖥️ Console tracking workspace restored.");
         }
@@ -211,59 +391,47 @@ if (consoleBox && toggleConsoleBtn) {
 const toggleLinesBtn = document.getElementById('btn-toggle-lines');
 const lineNumbersDiv = document.getElementById('line-numbers');
 
-// 🔄 GLOBAL BRIDGE: This lets any function lower down in app.js trigger a line recount!
 let triggerLineUpdate = null;
 
 if (editorElement && lineNumbersDiv && toggleLinesBtn) {
-    
-    // 1. Core Generator: Count lines inside CodeJar string matrix and populate sidebar
     const updateLineNumbers = (codeText) => {
-        // Fallback to reading the engine directly if code string isn't explicitly passed
         const currentCode = (typeof codeText === 'string') ? codeText : jar.toString();
         const linesCount = currentCode.split('\n').length;
         const linesArray = Array.from({ length: linesCount }, (_, i) => i + 1);
         lineNumbersDiv.innerHTML = linesArray.join('<br>');
     };
 
-    // Expose the internal function to our global bridge variable
     triggerLineUpdate = updateLineNumbers;
 
-    // Synchronize numbers and local cache continuously via CodeJar's built-in event hook
     jar.onUpdate((code) => {
         updateLineNumbers(code);
         localStorage.setItem('openscad_editor_cache', code);
     });
 
-    // 2. Scroll Synchronization: Lock sidebar position to CodeJar div text scroll track
     editorElement.addEventListener('scroll', () => {
         lineNumbersDiv.scrollTop = editorElement.scrollTop;
     });
 
-    // 3. Persistent Visibility Toggle Management
     let isLinesEnabled = localStorage.getItem('openscad_lines_visible') !== 'disabled';
 
     const applyLinesLayout = (enabled) => {
         if (enabled) {
             lineNumbersDiv.style.display = 'block';
             toggleLinesBtn.textContent = 'Enabled';
-            toggleLinesBtn.style.backgroundColor = '#28a745'; // Balanced UI Green
+            toggleLinesBtn.style.backgroundColor = '#28a745'; 
             isLinesEnabled = true;
             localStorage.setItem('openscad_lines_visible', 'enabled');
-            
-            // 🔄 FORCE RECALCULATION: Populate text lines immediately when turning visible
             updateLineNumbers();
-            // Sync up scroll layout in case user scrolled while it was hidden
             lineNumbersDiv.scrollTop = editorElement.scrollTop;
         } else {
             lineNumbersDiv.style.display = 'none';
             toggleLinesBtn.textContent = 'Disabled';
-            toggleLinesBtn.style.backgroundColor = '#dc3545'; // Attention Red
+            toggleLinesBtn.style.backgroundColor = '#dc3545'; 
             isLinesEnabled = false;
             localStorage.setItem('openscad_lines_visible', 'disabled');
         }
     };
 
-    // 🚀 INITIALIZE CODES ON PAGE BOOT UP:
     updateLineNumbers();
     applyLinesLayout(isLinesEnabled);
 
@@ -304,12 +472,10 @@ if (btnColorTrigger) {
 
 let activeModelColor = parseInt(savedColorHexStr.replace('#', '0x'), 16);
 
-// Store the FACTORY engine globally instead of a single-use instance
 let openSCADFactory = null;
 let currentStlBlob = null; 
 const fontCache = {}; 
 
-// Helper to log to our UI console
 function logToConsole(message) {
     let cleanMessage = message.replace(/^\[ERROR\]:\s*/gm, '');
 
@@ -324,9 +490,8 @@ function logToConsole(message) {
 
 // ---- FILE OPERATIONS (.scad) ----
 
-// Save local .scad file
 btnSave.addEventListener('click', () => {
-    const code = jar.toString(); // 🍯 UPGRADED: Pull code string directly from CodeJar
+    const code = jar.toString(); 
     const blob = new Blob([code], { type: 'text/plain' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
@@ -339,14 +504,13 @@ btnSave.addEventListener('click', () => {
     logToConsole(`Saved ${safeFilename}.scad successfully.`);
 });
 
-// Load local .scad file
 fileLoad.addEventListener('change', (event) => {
     const file = event.target.files[0];
     if (!file) return;
     
     const reader = new FileReader();
     reader.onload = (e) => {
-        jar.updateCode(e.target.result); // 🍯 UPGRADED: Seed loaded text into CodeJar frame
+        jar.updateCode(e.target.result); 
         logToConsole(`Loaded file: ${file.name}`);
 
         localStorage.setItem('openscad_editor_cache', e.target.result);
@@ -365,7 +529,7 @@ fileLoad.addEventListener('change', (event) => {
     reader.readAsText(file);
 });
 
-// Toggle between Solid and Wireframe viewing modes
+let wireframeMode = false;
 btnWireframe.addEventListener('click', () => {
     wireframeMode = !wireframeMode; 
     
@@ -382,7 +546,6 @@ btnWireframe.addEventListener('click', () => {
     }
 });
 
-// Global Application Hotkey Command Mappings
 window.addEventListener('keydown', (event) => {
     if (event.ctrlKey && event.key === 'Enter') {
         event.preventDefault(); 
@@ -394,12 +557,10 @@ window.addEventListener('keydown', (event) => {
     }
 });
 
-// Route button clicks directly into the hidden native color input element
 btnColorTrigger.addEventListener('click', () => {
     modelColorInput.click();
 });
 
-// Live update the material color and button preview background when the palette value shifts
 modelColorInput.addEventListener('input', (event) => {
     const selectedHex = event.target.value;
     
@@ -413,21 +574,19 @@ modelColorInput.addEventListener('input', (event) => {
 });
 
 async function initOpenSCAD() {
-    logToConsole(`Build ${BUILD_NUMBER} - May 22, 2026`);
+    logToConsole(`Build ${BUILD_NUMBER} - May 23, 2026`);
     logToConsole('System ready. Instantiating WASM...');
     
-    // Restore persistent code cache
     const savedCode = localStorage.getItem('openscad_editor_cache');
     if (savedCode && savedCode.trim() !== "") {
-        jar.updateCode(savedCode); // 🍯 UPGRADED
+        jar.updateCode(savedCode); 
         logToConsole('Restored draft layout from your last active session.');
     } else {
         const defaultCode = `linear_extrude(height = 4) {\n\ttext(\n\t\ttext = "Hello, world!", \n\t\tsize = 14, \n\t\tfont = "Liberation Sans:style=Bold", \n\t\thalign = "center", \n\t\tvalign = "center"\n\t);\n}`;
-        jar.updateCode(defaultCode); // 🍯 UPGRADED
+        jar.updateCode(defaultCode); 
         logToConsole('Seeded editor workspace with default starter geometry.');
     }
 
-    // 🚀 UPDATE LINE NUMBERS INSTANTLY ON PAGE LOAD
     if (typeof triggerLineUpdate === 'function') {
         triggerLineUpdate();
     }
@@ -441,7 +600,6 @@ async function initOpenSCAD() {
             throw new Error("OpenSCAD factory interface could not be resolved.");
         }
 
-        // Initialize the factory to ensure it's cached in the browser
         await openSCADFactory();
         
         logToConsole('Loading typography packages from local repository...');
@@ -452,7 +610,6 @@ async function initOpenSCAD() {
             'LiberationSerif-Regular.ttf', 'LiberationSerif-Bold.ttf', 'LiberationSerif-Italic.ttf', 'LiberationSerif-BoldItalic.ttf'
         ];
 
-        // Download fonts and store the raw bytes directly into JS memory
         for (const fontName of fontFiles) {
             try {
                 const fontUrl = `./fonts/${fontName}`;
@@ -487,9 +644,7 @@ async function initOpenSCAD() {
     }
 }
 
-
 // ---- THE PREVIEW TRIGGER (F5 Style) ----
-
 btnPreview.addEventListener('click', async () => {
     if (!openSCADFactory) {
         logToConsole('Error: OpenSCAD engine factory is not loaded yet.');
@@ -497,7 +652,7 @@ btnPreview.addEventListener('click', async () => {
     }
 
     logToConsole('--- Generating Preview ---');
-    const scriptCode = jar.toString(); // 🍯 UPGRADED: Pull raw string snapshot from CodeJar
+    const scriptCode = jar.toString(); 
     const errorLogs = [];
 
     try {
@@ -544,15 +699,12 @@ btnPreview.addEventListener('click', async () => {
         }
         logToConsole('Typography injected into fresh compilation sandbox.');
 
-        // 1. Write the user's code into the fresh instance's virtual memory
         instance.FS.writeFile('/input.scad', scriptCode);
         logToConsole('Code loaded into virtual memory.');
 
-        // 2. Execute OpenSCAD compilation
         logToConsole('Compiling geometry via WASM...');
         instance.callMain(['/input.scad', '-o', '/output.stl']);
         
-        // 3. Verify output creation
         if (instance.FS.analyzePath('/output.stl').exists) {
             logToConsole('SUCCESS: 3D Mesh computed.');
 
@@ -578,7 +730,6 @@ btnPreview.addEventListener('click', async () => {
                 }
             }
 
-            // 🍯 Note: Highlight line feature skipped for editable inputs to preserve focus states safely
             if (detectedErrorLine) {
                 logToConsole(`👉 Suspected syntax break near Line ${detectedErrorLine}.`);
             }
@@ -590,9 +741,7 @@ btnPreview.addEventListener('click', async () => {
     }
 });
 
-
 // ---- THE EXPORT TRIGGER (Save STL) ----
-
 btnExport.addEventListener('click', () => {
     if (!currentStlBlob) {
         logToConsole('Nothing to export. Run Preview first.');
@@ -606,9 +755,7 @@ btnExport.addEventListener('click', () => {
     logToConsole('Exported openscad_model.stl successfully.');
 });
 
-
 // ---- SERVICE WORKER REGISTRATION ----
-
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
         navigator.serviceWorker.register('./sw.js')
@@ -618,13 +765,11 @@ if ('serviceWorker' in navigator) {
 }
 
 // ---- THE THREE.JS STL WORKSPACE VIEWPORT ENGINE ----
-
 let scene, camera, renderer, controls, currentMesh = null;
 let workspaceInitialized = false;
-let wireframeMode = false;
 
 function init3DWorkspace() {
-    if (workspaceInitialized) return; // Prevent double-booting
+    if (workspaceInitialized) return; 
     workspaceInitialized = true;
 
     const container = document.getElementById('viewer-3d');
@@ -633,27 +778,22 @@ function init3DWorkspace() {
     const w = container.clientWidth || 500;
     const h = container.clientHeight || 500;
 
-    // 1. Scene Setup
     scene = new THREE.Scene();
     scene.background = new THREE.Color(0x222222);
 
-    // 2. Camera Viewport Calculation (Protected against Infinity)
     camera = new THREE.PerspectiveCamera(45, w / h, 0.1, 10000);
     camera.position.set(40, 40, 40);
 
-    // 3. WebGL Canvas Core Renderer Mounting
     renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(w, h);
-    renderer.setPixelRatio(window.devicePixelRatio); // Forces crisp rendering on high-res displays
+    renderer.setPixelRatio(window.devicePixelRatio); 
     container.appendChild(renderer.domElement);
 
-    // 4. Mouse Orbit Controls Integration
     controls = new THREE.OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.1;
     controls.target.set(0, 0, 0);
 
-    // ---- 3D WORKSPACE GRID AND ORIGIN AXES ----
     const gridHelper = new THREE.GridHelper(400, 40, 0x007acc, 0x444444);
     gridHelper.position.y = -0.05; 
     scene.add(gridHelper);
@@ -662,7 +802,6 @@ function init3DWorkspace() {
     axesHelper.rotation.x = -Math.PI / 2;    
     scene.add(axesHelper);
 
-    // ---- CORNER NAVIGATION COMPASS GENERATOR ----
     const compassContainer = document.createElement('div');
     compassContainer.style.position = 'absolute';
     compassContainer.style.top = '10px';
@@ -685,7 +824,6 @@ function init3DWorkspace() {
     compassAxes.rotation.x = -Math.PI / 2;
     compassScene.add(compassAxes);
 
-    // ---- 🖥️ OPENSCAD-OPTIMIZED CAD LIGHTING SYSTEM ----
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.55); 
     scene.add(ambientLight);
 
@@ -702,7 +840,6 @@ function init3DWorkspace() {
     camera.add(headlight); 
     scene.add(camera); 
     
-    // 6. Robust Animation Loop with Live Layout Boundary Matching
     function animate() {
         requestAnimationFrame(animate);
         
@@ -721,7 +858,6 @@ function init3DWorkspace() {
         controls.update();
         renderer.render(scene, camera);
 
-        // --- COMPASS SYNCHRONIZATION MATRIX PASSTHROUGH ---
         if (compassCamera && compassRenderer) {
             compassCamera.position.copy(camera.position);
             compassCamera.position.sub(controls.target); 
@@ -734,11 +870,9 @@ function init3DWorkspace() {
     animate();
 }
 
-// Global invocation hook for OpenSCAD preview button
 function update3DModelViewer(blobUrl) {
     if (!workspaceInitialized) init3DWorkspace(); 
 
-    // ---- STEP 1: CAPTURE CURRENT VIEW STATE BEFORE WIPING SCENE ----
     let savedPosition = null;
     let savedTarget = null;
     
@@ -758,9 +892,6 @@ function update3DModelViewer(blobUrl) {
     loader.load(blobUrl, (geometry) => {
         geometry.computeVertexNormals();
         
-        // ==========================================================================
-        // 🎨 PROCEDURAL MATTE NOISE MATERIAL INJECTION
-        // ==========================================================================
         const material = new THREE.MeshStandardMaterial({ 
             color: activeModelColor, 
             roughness: 0.85,     
@@ -789,7 +920,6 @@ function update3DModelViewer(blobUrl) {
                 `
             );
         };
-        // ==========================================================================
         
         currentMesh = new THREE.Mesh(geometry, material);
         
@@ -801,7 +931,6 @@ function update3DModelViewer(blobUrl) {
         geometry.computeBoundingBox();
         geometry.computeBoundingSphere();
         
-        // ---- STEP 2: RESTORE VIEW OR INITIALIZE CAMERA POSITION ----
         if (savedPosition && savedTarget) {
             camera.position.copy(savedPosition);
             controls.target.copy(savedTarget);
@@ -820,18 +949,13 @@ function update3DModelViewer(blobUrl) {
 }
 
 // ---- BOOTSTRAP APPLICATION ----
-
-// 1. Lock UI buttons until WASM loads
 btnPreview.disabled = true;
 btnExport.disabled = true;
 
-// 2. Initialize background compiler
 initOpenSCAD();
-
-// 3. Boot 3D environment immediately so size caches correctly
 init3DWorkspace();
 
-btnWireframe.style.background = '#007acc'; // Vibrant active solid blue
+btnWireframe.style.background = '#007acc'; 
 
 // ==========================================================================
 // ⚙️ SETTINGS OVERLAY CONTROLLER LOGIC
@@ -874,7 +998,6 @@ window.addEventListener('keydown', (event) => {
     }
 });
 
-// 5. Project Name Change Event Handler
 if (projectNameInput) {
     projectNameInput.addEventListener('input', (event) => {
         let cleanedName = event.target.value.replace(/[/\\?%*:|"<>. ]/g, '_');
@@ -893,7 +1016,6 @@ if (projectNameInput) {
     });
 }
 
-// 🟢 Editor Text Scaling Change Listener
 if (editorFontSizeSelect) {
     editorFontSizeSelect.addEventListener('change', (event) => {
         const selectedSize = event.target.value;
@@ -905,7 +1027,6 @@ if (editorFontSizeSelect) {
     });
 }
 
-// 6. Camera Viewport Boundary Reset Engine
 if (btnCameraReset) {
     btnCameraReset.addEventListener('click', () => {
         if (currentMesh && currentMesh.geometry && camera && controls) {
