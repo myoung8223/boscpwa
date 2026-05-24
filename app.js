@@ -1274,7 +1274,7 @@ function createCompassLabel(text, color) {
     const ctx = canvas.getContext('2d');
 
     // Render bold, clean letters
-    ctx.font = 'Bold 56px Arial, sans-serif';
+    ctx.font = 'Bold 72px Arial, sans-serif';
     ctx.fillStyle = color;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
