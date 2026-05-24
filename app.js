@@ -971,12 +971,12 @@ function init3DWorkspace() {
     compassRenderer.setPixelRatio(window.devicePixelRatio);
     compassContainer.appendChild(compassRenderer.domElement);
 
-    const compassAxes = new THREE.AxesHelper(20);   // was 25
+    const compassAxes = new THREE.AxesHelper(18);   // was 25, was 20
     compassAxes.rotation.x = -Math.PI / 2;
     compassScene.add(compassAxes);
 
     // 🏷️ ADD COMPASS AXES LABELS (X, Y, Z)
-    const mid = 23; // Exactly half of your 25-unit length, was 12.5
+    const mid = 22; // Exactly half of your 25-unit length, was 12.5, was 23
 
     const xLabel = createCompassLabel('X', '#ff0000'); // Red
     const yLabel = createCompassLabel('Y', '#00ff00'); // Green
@@ -1274,7 +1274,7 @@ function createCompassLabel(text, color) {
     const ctx = canvas.getContext('2d');
 
     // Render bold, clean letters
-    ctx.font = 'Bold 72px Arial, sans-serif';
+    ctx.font = 'Bold 90px Arial, sans-serif';
     ctx.fillStyle = color;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
