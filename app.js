@@ -47,12 +47,37 @@ const jar = CodeJar(
     { tab: '\t', history: true, indentOn: /[(\[{]$/, addClosing: false } 
 );
 
-// 🖱️ Passive navigation listeners
+// 🖱️ Passive navigation & keyboard shortcut listeners
 if (editorElement) {
+    // 1. Bracket updates on mouse clicks
     editorElement.addEventListener('click', () => applyInlineBracketMatching(editorElement));
+    
+    // 2. Bracket updates on arrow key movements
     editorElement.addEventListener('keyup', (e) => {
         if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Home', 'End', 'PageUp', 'PageDown'].includes(e.key)) {
             applyInlineBracketMatching(editorElement);
+        }
+    });
+
+    // 3. ⌨️ WINDOWS REDO SHORTCUT MAPPER (Ctrl + Y -> Ctrl + Shift + Z)
+    editorElement.addEventListener('keydown', (event) => {
+        // Detect Ctrl + Y (or Cmd + Y)
+        if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'y') {
+            // Stop the browser from attempting a native redo
+            event.preventDefault();
+            event.stopImmediatePropagation();
+
+            // Fire a synthetic Ctrl+Shift+Z key event that CodeJar recognizes perfectly
+            const fakeRedoEvent = new KeyboardEvent('keydown', {
+                key: 'Z',
+                code: 'KeyZ',
+                ctrlKey: true,
+                shiftKey: true,
+                bubbles: true,
+                cancelable: true
+            });
+
+            editorElement.dispatchEvent(fakeRedoEvent);
         }
     });
 }
