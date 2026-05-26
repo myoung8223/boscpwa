@@ -1006,4 +1006,511 @@ function init3DWorkspace() {
     axesGroup = new THREE.Group();
     const gridHalfSize = 200;
 
-    const overlayConfig = (colorHex
+    const overlayConfig = (colorHex) => ({
+        color: colorHex,
+        depthTest: true,           
+        transparent: true,
+        polygonOffset: true,
+        polygonOffsetFactor: 0.5,  
+        polygonOffsetUnits: 0.5
+    });
+
+    const xGeometry = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(-gridHalfSize, 0, 0),
+        new THREE.Vector3(gridHalfSize, 0, 0)
+    ]);
+    const xAxisLine = new THREE.Line(xGeometry, new THREE.LineBasicMaterial(overlayConfig(0xcc5252)));
+    axesGroup.add(xAxisLine);
+
+    const yGeometry = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(0, 0, -gridHalfSize),
+        new THREE.Vector3(0, 0, gridHalfSize)
+    ]);
+    const yAxisLine = new THREE.Line(yGeometry, new THREE.LineBasicMaterial(overlayConfig(0x52cc7a)));
+    axesGroup.add(yAxisLine);
+
+    const zGeometry = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(0, -gridHalfSize, 0), 
+        new THREE.Vector3(0, gridHalfSize, 0)   
+    ]);
+    const zAxisLine = new THREE.Line(zGeometry, new THREE.LineBasicMaterial(overlayConfig(0x007acc)));
+    axesGroup.add(zAxisLine);
+    
+    scene.add(axesGroup);
+    
+    // 🔒 APPLY SAVED PERSISTENT VISIBILITY STATES TO 3D OBJECTS ON LOAD
+    gridHelper.visible = isGridVisible;
+    axesGroup.visible = isAxesVisible;
+    
+    const compassContainer = document.createElement('div');
+    compassContainer.style.position = 'absolute';
+    compassContainer.style.top = '10px';
+    compassContainer.style.right = '10px';
+    compassContainer.style.width = '80px';
+    compassContainer.style.height = '80px';
+    compassContainer.style.zIndex = '100';
+    compassContainer.style.pointerEvents = 'none'; 
+    container.appendChild(compassContainer);
+
+    const compassScene = new THREE.Scene();
+    const compassCamera = new THREE.PerspectiveCamera(50, 1, 1, 100);
+    
+    const compassRenderer = new THREE.WebGLRenderer({ alpha: true, antialias: true }); 
+    compassRenderer.setSize(80, 80);
+    compassRenderer.setPixelRatio(window.devicePixelRatio);
+    compassContainer.appendChild(compassRenderer.domElement);
+
+    const compassAxes = new THREE.AxesHelper(20);
+    compassAxes.rotation.x = -Math.PI / 2;
+
+    const colors = compassAxes.geometry.attributes.color;
+    colors.setXYZ(0, 0.8, 0.32, 0.32); colors.setXYZ(1, 0.8, 0.32, 0.32); 
+    colors.setXYZ(2, 0.32, 0.8, 0.48); colors.setXYZ(3, 0.32, 0.8, 0.48); 
+    colors.setXYZ(4, 0.0, 0.48, 0.8);  colors.setXYZ(5, 0.0, 0.48, 0.8);  
+    colors.needsUpdate = true; 
+
+    compassScene.add(compassAxes);
+
+    const create2DLabel = (id, text, color) => {
+        const oldEl = document.getElementById(id);
+        if (oldEl) oldEl.remove();
+
+        const el = document.createElement('div');
+        el.id = id;
+        el.innerText = text;
+        el.style.position = 'absolute';
+        el.style.color = color;
+        el.style.fontFamily = 'Arial, sans-serif';
+        el.style.fontWeight = 'bold';
+        el.style.fontSize = '10px'; 
+        el.style.pointerEvents = 'none';
+        el.style.transform = 'translate(-50%, -50%)';
+        compassContainer.appendChild(el);
+        return el;
+    };
+
+    create2DLabel('compass-lbl-x', 'X', '#888888');
+    create2DLabel('compass-lbl-y', 'Y', '#888888');
+    create2DLabel('compass-lbl-z', 'Z', '#888888');
+
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.55); 
+    scene.add(ambientLight);
+
+    const keyLight = new THREE.DirectionalLight(0xffffff, 0.5); 
+    keyLight.position.set(150, 200, 100);
+    scene.add(keyLight);
+
+    const topLight = new THREE.DirectionalLight(0xffffff, 0.15); 
+    topLight.position.set(0, 250, 0);
+    scene.add(topLight);
+
+    const headlight = new THREE.DirectionalLight(0xffffff, 0.45);
+    headlight.position.set(0, 0, 1); 
+    camera.add(headlight); 
+    scene.add(camera); 
+    
+    function animate() {
+        requestAnimationFrame(animate);
+        
+        const cw = container.clientWidth;
+        const ch = container.clientHeight;
+        
+        const currentSize = new THREE.Vector2();
+        renderer.getSize(currentSize);
+        
+        if (cw > 0 && ch > 0 && (currentSize.x !== cw || currentSize.y !== ch)) {
+            camera.aspect = cw / ch;
+            camera.updateProjectionMatrix();
+            renderer.setSize(cw, ch, true);
+        }
+
+        controls.update();
+        renderer.render(scene, camera);
+
+        if (compassCamera && compassRenderer) {
+            compassCamera.position.copy(camera.position);
+            compassCamera.position.sub(controls.target); 
+            compassCamera.position.setLength(60); 
+            compassCamera.lookAt(0, 0, 0);
+            
+            compassRenderer.render(compassScene, compassCamera);
+
+            const xEl = document.getElementById('compass-lbl-x');
+            const yEl = document.getElementById('compass-lbl-y');
+            const zEl = document.getElementById('compass-lbl-z');
+
+            if (xEl && yEl && zEl && compassAxes) {
+                const width = 80;
+                const height = 80;
+                const tempV = new THREE.Vector3();
+
+                compassScene.updateMatrixWorld(true);
+
+                const updateLabelPosition = (element, x3d, y3d, z3d) => {
+                    tempV.set(x3d, y3d, z3d).applyMatrix4(compassAxes.matrixWorld);
+                    tempV.project(compassCamera);
+                    
+                    const pixelX = (tempV.x * 0.5 + 0.5) * width;
+                    const pixelY = (-tempV.y * 0.5 + 0.5) * height;
+                    
+                    element.style.left = `${pixelX}px`;
+                    element.style.top = `${pixelY}px`;
+                };
+
+                updateLabelPosition(xEl, 15, 0, 0);
+                updateLabelPosition(yEl, 0, 15, 0);
+                updateLabelPosition(zEl, 0, 0, 15);
+            }
+        }
+    }
+    animate();
+}
+
+function update3DModelViewer(blobUrl) {
+    if (!workspaceInitialized) init3DWorkspace(); 
+
+    let savedPosition = null;
+    let savedTarget = null;
+    
+    if (currentMesh && camera && controls) {
+        savedPosition = camera.position.clone();
+        savedTarget = controls.target.clone();
+    }
+
+    if (currentMesh) {
+        scene.remove(currentMesh);
+        currentMesh.geometry.dispose();
+        currentMesh.material.dispose();
+        currentMesh = null;
+    }
+
+    const loader = new THREE.STLLoader();
+    loader.load(blobUrl, (geometry) => {
+        geometry.computeVertexNormals();
+        
+        const material = new THREE.MeshStandardMaterial({ 
+            color: activeModelColor, 
+            roughness: 0.85,     
+            metalness: 0.05,     
+            wireframe: wireframeMode 
+        });
+
+        material.onBeforeCompile = (shader) => {
+            const noiseGLSL = `
+                float hash(vec2 p) {
+                    return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
+                }
+                float proceduralNoise(vec3 p) {
+                    return hash(p.xy + p.z);
+                }
+            `;
+            shader.fragmentShader = noiseGLSL + shader.fragmentShader;
+            shader.fragmentShader = shader.fragmentShader.replace(
+                `#include <opaque_fragment>`,
+                `
+                float noiseGrit = proceduralNoise(vViewPosition * 4.0) * 0.12;
+                outgoingLight.rgb += vec3(noiseGrit - 0.06);
+                #include <opaque_fragment>
+                `
+            );
+        };
+        
+        currentMesh = new THREE.Mesh(geometry, material);
+        currentMesh.position.set(0, 0, 0);
+        currentMesh.rotation.x = -Math.PI / 2;
+
+        scene.add(currentMesh);
+        
+        geometry.computeBoundingBox();
+        geometry.computeBoundingSphere();
+        
+        if (savedPosition && savedTarget) {
+            camera.position.copy(savedPosition);
+            controls.target.copy(savedTarget);
+        } else {
+            const radius = geometry.boundingSphere.radius;
+            const targetDistance = radius > 0 ? radius * 3.5 : 50; 
+
+            camera.position.set(targetDistance, targetDistance * 1.2, targetDistance);
+            controls.target.set(0, 0, 0); 
+            camera.lookAt(0, 0, 0);
+        }
+        controls.update();
+        
+    }, undefined, (err) => console.error('[Viewer Error]:', err));
+}
+
+// ---- BOOTSTRAP APPLICATION ----
+btnPreview.disabled = true;
+btnExport.disabled = true;
+
+initOpenSCAD();
+init3DWorkspace();
+
+btnWireframe.style.background = '#007acc'; 
+
+// ==========================================================================
+// ⚙️ SETTINGS & FONT MANAGER OVERLAY CONTROLLER LOGIC
+// ==========================================================================
+const btnSettings = document.getElementById('btn-settings');
+const btnCloseSettings = document.getElementById('btn-close-settings');
+const settingsOverlay = document.getElementById('settings-overlay');
+const btnToggleGrid = document.getElementById('btn-toggle-grid');
+const btnToggleAxes = document.getElementById('btn-toggle-axes');
+
+// Font Manager specific DOM targets
+const btnOpenFontsMenu = document.getElementById('btn-open-fonts-menu');
+const fontsOverlay = document.getElementById('fonts-overlay');
+const btnCloseFonts = document.getElementById('btn-close-fonts');
+const fontUploadInput = document.getElementById('font-upload');
+
+function openSettingsMenu() {
+    if (settingsOverlay) {
+        settingsOverlay.classList.remove('hidden');
+    }
+}
+
+function closeSettingsMenu() {
+    if (settingsOverlay) {
+        settingsOverlay.classList.add('hidden');
+    }
+    // Safely force close the fonts menu if user clicks off the background
+    if (fontsOverlay) {
+        fontsOverlay.classList.add('hidden');
+    }
+}
+
+if (btnSettings) {
+    btnSettings.addEventListener('click', openSettingsMenu);
+}
+
+if (btnCloseSettings) {
+    btnCloseSettings.addEventListener('click', closeSettingsMenu);
+}
+
+window.addEventListener('click', (event) => {
+    if (event.target === settingsOverlay || event.target === fontsOverlay) {
+        closeSettingsMenu();
+    }
+});
+
+window.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
+        let closedSomething = false;
+        if (fontsOverlay && !fontsOverlay.classList.contains('hidden')) {
+            closedSomething = true;
+        }
+        if (settingsOverlay && !settingsOverlay.classList.contains('hidden')) {
+            closedSomething = true;
+        }
+        if (closedSomething) {
+            logToConsole('⌨️ Hotkey Triggered: [Escape] - Closing Overlays');
+            closeSettingsMenu();
+        }
+    }
+});
+
+// 🎨 DYNAMIC DOM UI RENDERER FOR INSTALLED CUSTOM FONTS
+async function renderCustomFontManagerList() {
+    const listContainer = document.getElementById('custom-fonts-manager-list');
+    if (!listContainer) return;
+    
+    // Grab all stored typography records straight out of the IndexedDB vault
+    const customFonts = await getPersistentFonts();
+    
+    if (customFonts.length === 0) {
+        listContainer.innerHTML = `<div style="font-size: 0.8rem; color: #555; text-align: center; padding: 12px; font-style: italic;">No custom fonts installed</div>`;
+        return;
+    }
+    
+    listContainer.innerHTML = ''; 
+    
+    customFonts.forEach(font => {
+        const row = document.createElement('div');
+        row.style.display = 'flex';
+        row.style.justifyContent = 'space-between';
+        row.style.alignItems = 'center';
+        row.style.padding = '8px 10px';
+        row.style.borderBottom = '1px solid #222';
+        row.style.fontSize = '0.85rem';
+        
+        const nameLabel = document.createElement('span');
+        nameLabel.textContent = font.filename;
+        nameLabel.style.overflow = 'hidden';
+        nameLabel.style.textOverflow = 'ellipsis';
+        nameLabel.style.whiteSpace = 'nowrap';
+        nameLabel.style.maxWidth = '190px';
+        nameLabel.style.color = '#ddd';
+        
+        const delBtn = document.createElement('button');
+        delBtn.textContent = '✕';
+        delBtn.style.background = '#dc3545';
+        delBtn.style.color = '#fff';
+        delBtn.style.padding = '2px 7px';
+        delBtn.style.fontSize = '0.75rem';
+        delBtn.style.borderRadius = '3px';
+        delBtn.style.cursor = 'pointer';
+        delBtn.style.fontWeight = 'bold';
+        
+        delBtn.addEventListener('click', async () => {
+            if (confirm(`Are you sure you want to completely uninstall "${font.filename}"?`)) {
+                await deletePersistentFont(font.filename);
+                delete fontCache[font.filename]; 
+                
+                logToConsole(`🗑️ Custom typography uninstalled: ${font.filename}`);
+                renderCustomFontManagerList();
+                
+                if (openSCADFactory && !btnPreview.disabled) { 
+                    btnPreview.click(); 
+                }
+            }
+        });
+        
+        row.appendChild(nameLabel);
+        row.appendChild(delBtn);
+        listContainer.appendChild(row);
+    });
+}
+
+// ---- FONT MANAGER MODAL BRIDGE ----
+if (btnOpenFontsMenu) {
+    btnOpenFontsMenu.addEventListener('click', () => {
+        if (settingsOverlay) settingsOverlay.classList.add('hidden'); // Hide base settings
+        if (fontsOverlay) {
+            fontsOverlay.classList.remove('hidden'); // Display font manager
+            renderCustomFontManagerList();           // Hydrate the visual list from IndexedDB
+        }
+    });
+}
+
+if (btnCloseFonts) {
+    btnCloseFonts.addEventListener('click', () => {
+        if (fontsOverlay) fontsOverlay.classList.add('hidden');
+        if (settingsOverlay) settingsOverlay.classList.remove('hidden'); // Go back to settings
+    });
+}
+
+// ---- CUSTOM USER FONT INGESTION HOOK ----
+if (fontUploadInput) {
+    fontUploadInput.addEventListener('change', (event) => {
+        const file = event.target.files[0];
+        if (!file) return;
+        
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            const arrayBuffer = e.target.result;
+            const fontData = new Uint8Array(arrayBuffer);
+            
+            fontCache[file.name] = fontData;
+            await savePersistentFont(file.name, fontData);
+            
+            logToConsole(`📁 Font "${file.name}" imported and saved permanently to PWA.`);
+            logToConsole(`👉 Tip: Ensure you type the exact internal Font Family name inside your text() module.`);
+            
+            renderCustomFontManagerList();
+            
+            if (openSCADFactory && !btnPreview.disabled) {
+                btnPreview.click();
+            }
+        };
+        reader.readAsArrayBuffer(file);
+        
+        // Reset the input value so the same file can be uploaded again if needed
+        event.target.value = '';
+    });
+}
+
+// ==========================================================================
+// ⚙️ PERSISTENT GRID & AXES VISIBILITY LOGIC
+// ==========================================================================
+
+const applyGridLayout = (visible) => {
+    isGridVisible = visible;
+    localStorage.setItem('openscad_grid_visible', visible);
+    
+    if (gridHelper) gridHelper.visible = visible;
+    
+    if (btnToggleGrid) {
+        btnToggleGrid.innerText = visible ? 'Visible' : 'Hidden';
+        btnToggleGrid.style.backgroundColor = visible ? '#28a745' : '#dc3545';
+    }
+};
+
+const applyAxesLayout = (visible) => {
+    isAxesVisible = visible;
+    localStorage.setItem('openscad_axes_visible', visible);
+    
+    if (axesGroup) axesGroup.visible = visible;
+    
+    if (btnToggleAxes) {
+        btnToggleAxes.innerText = visible ? 'Visible' : 'Hidden';
+        btnToggleAxes.style.backgroundColor = visible ? '#28a745' : '#dc3545';
+    }
+};
+
+// Apply states to UI on load (Reads from global trackers initialized at the top)
+applyGridLayout(isGridVisible);
+applyAxesLayout(isAxesVisible);
+
+if (btnToggleGrid) {
+    btnToggleGrid.addEventListener('click', () => applyGridLayout(!isGridVisible));
+}
+
+if (btnToggleAxes) {
+    btnToggleAxes.addEventListener('click', () => applyAxesLayout(!isAxesVisible));
+}
+
+// ==========================================================================
+// 📐 PERSISTENT DRAGGABLE SPLIT-PANE CONTROLLER
+// ==========================================================================
+const leftPaneContainer = document.getElementById('left-pane-container');
+const panelSplitGutter = document.getElementById('panel-split-gutter');
+
+if (leftPaneContainer && panelSplitGutter) {
+    const cachedSplitValue = localStorage.getItem('openscad_layout_split') || '50';
+    leftPaneContainer.style.width = `${cachedSplitValue}%`;
+
+    panelSplitGutter.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        
+        document.body.style.cursor = 'col-resize';
+        document.body.style.userSelect = 'none';
+
+        function onMouseMove(moveEvent) {
+            let calculatedWidthPercent = (moveEvent.clientX / window.innerWidth) * 100;
+
+            if (calculatedWidthPercent < 15) calculatedWidthPercent = 15;
+            if (calculatedWidthPercent > 85) calculatedWidthPercent = 85;
+
+            leftPaneContainer.style.width = `${calculatedWidthPercent}%`;
+            
+            localStorage.setItem('openscad_layout_split', Math.round(calculatedWidthPercent).toString());
+            
+            if (typeof renderer !== 'undefined' && renderer && typeof camera !== 'undefined' && camera) {
+                const container3d = document.getElementById('viewer-3d');
+                if (container3d) {
+                    const currentWidth = container3d.clientWidth;
+                    const currentHeight = container3d.clientHeight;
+                    if (currentWidth > 0 && currentHeight > 0) {
+                        camera.aspect = currentWidth / currentHeight;
+                        camera.updateProjectionMatrix();
+                        renderer.setSize(currentWidth, currentHeight, true);
+                    }
+                }
+            }
+        }
+
+        function onMouseUp() {
+            document.removeEventListener('mousemove', onMouseMove);
+            document.removeEventListener('mouseup', onMouseUp);
+            
+            document.body.style.cursor = 'default';
+            document.body.style.userSelect = 'text';
+            
+            logToConsole(`📐 Split layout updated and cached to: ${localStorage.getItem('openscad_layout_split')}%`);
+        }
+
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+    });
+}
