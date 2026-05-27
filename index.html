@@ -59,8 +59,40 @@
         .settings-group { margin: 16px 0; display: flex; justify-content: space-between; align-items: center; }
 
         /* 📊 Two Column Settings Layout */
-        .settings-columns-wrapper { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 15px; }
-        @media (max-width: 600px) { .settings-columns-wrapper { grid-template-columns: 1fr; gap: 10px; } }
+        /* .settings-columns-wrapper { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 15px; } */
+        /* @media (max-width: 600px) { .settings-columns-wrapper { grid-template-columns: 1fr; gap: 10px; } } */
+
+        /* 📊 Two Column Settings Layout with Vertical Divider */
+        .settings-columns-wrapper { 
+            display: grid; 
+            grid-template-columns: 1fr 1fr; 
+            margin-top: 15px; 
+        }
+        .settings-column:first-child {
+            padding-right: 20px;
+            border-right: 1px solid #444; /* The thin gray line */
+        }
+        .settings-column:last-child {
+            padding-left: 20px;
+        }
+        
+        /* Mobile Responsive adjustment */
+        @media (max-width: 600px) { 
+            .settings-columns-wrapper { 
+                grid-template-columns: 1fr; 
+            } 
+            .settings-column:first-child {
+                padding-right: 0;
+                border-right: none;
+                border-bottom: 1px solid #444; /* Swaps to horizontal on mobile */
+                padding-bottom: 15px;
+                margin-bottom: 15px;
+            }
+            .settings-column:last-child {
+                padding-left: 0;
+            }
+        }
+    
 </style>
 </head>
 <body>
