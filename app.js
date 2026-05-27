@@ -551,11 +551,41 @@ if (projectNameInput) projectNameInput.value = activeProjectName;
 function updateWindowTitle() { document.title = `${activeProjectName}.scad`; }
 updateWindowTitle();
 
+// ---- PERSISTENT FONT SIZE INITIALIZATION & LISTENER ----
 const savedFontSizeStr = localStorage.getItem('openscad_editor_font_size') || '14px';
 if (editorElement && editorFontSizeSelect) {
     editorElement.style.fontSize = savedFontSizeStr;
     if (lineNumbersDiv) lineNumbersDiv.style.fontSize = savedFontSizeStr; 
     editorFontSizeSelect.value = savedFontSizeStr;
+
+    // 🔧 RESTORED: Font Size Changer Listener
+    editorFontSizeSelect.addEventListener('change', (event) => {
+        const newSize = event.target.value;
+        editorElement.style.fontSize = newSize;
+        if (lineNumbersDiv) lineNumbersDiv.style.fontSize = newSize;
+        localStorage.setItem('openscad_editor_font_size', newSize);
+        if (typeof triggerLineUpdate === 'function') triggerLineUpdate();
+    });
+}
+
+// 🔧 RESTORED: Camera Reset Listener
+if (btnCameraReset) {
+    btnCameraReset.addEventListener('click', () => {
+        if (camera && controls) {
+            // Check if there is an active model to center on, otherwise use default
+            if (currentMesh && currentMesh.geometry && currentMesh.geometry.boundingSphere) {
+                const radius = currentMesh.geometry.boundingSphere.radius; 
+                const targetDistance = radius > 0 ? radius * 3.5 : 50; 
+                camera.position.set(targetDistance, targetDistance * 1.2, targetDistance);
+            } else {
+                camera.position.set(40, 40, 40);
+            }
+            controls.target.set(0, 0, 0); 
+            camera.lookAt(0, 0, 0);
+            controls.update();
+            logToConsole('📷 Camera view reset.');
+        }
+    });
 }
 
 const savedColorHexStr = localStorage.getItem('openscad_model_color') || '#3b82f6';
