@@ -964,8 +964,24 @@ const licensesOverlay = document.getElementById('licenses-overlay');
 const btnCloseLicenses = document.getElementById('btn-close-licenses');
 const licensesTextContainer = document.getElementById('licenses-text-container');
 
-// 📄 BOILERPLATE LICENSE TEXT LITERAL
+// 📄 CREDITS AND LICENSE TEXT LITERAL
 const THIRD_PARTY_LICENSES_TEXT = `THIRD-PARTY OPEN SOURCE NOTICES & CREDITS
+
+===========================================================================
+0. DEVELOPMENT NOTICES & AI ATTRIBUTION
+===========================================================================
+Basic OpenSCAD PWA was architected, designed, and tested by Michael Young. 
+
+The vast majority of the code syntax in this application was generated 
+using Google Gemini Large Language Models (including Gemini Flash, Gemini 
+Pro, and Gemini Experimental/Thinking models). 
+
+The author's role focused on structural engineering ideas, UI/UX steering, 
+extensive behavioral testing, and orchestrating the integration of the 
+third-party libraries listed below.
+
+Link to GitHub page for this project:
+<a href="https://github.com/myoung8223/boscpwa/" target="_blank" style="color: #52b1ff; text-decoration: underline; font-weight: bold;">https://github.com/myoung8223/boscpwa/</a>
 
 ===========================================================================
 1. Basic OpenSCAD PWA (GNU GPL v2 License)
@@ -1417,6 +1433,7 @@ window.addEventListener('keydown', (event) => {
     }
 });
 
+/*
 // ---- LICENSES BRIDGES & RENDERING ----
 if (btnOpenLicensesMenu) {
     btnOpenLicensesMenu.addEventListener('click', () => {
@@ -1426,6 +1443,21 @@ if (btnOpenLicensesMenu) {
             // Inject the string literal into the pre/code container
             if (licensesTextContainer) {
                 licensesTextContainer.textContent = THIRD_PARTY_LICENSES_TEXT;
+            }
+        }
+    });
+}
+*/
+
+// ---- LICENSES BRIDGES & RENDERING ----
+if (btnOpenLicensesMenu) {
+    btnOpenLicensesMenu.addEventListener('click', () => {
+        if (settingsOverlay) settingsOverlay.classList.add('hidden');
+        if (licensesOverlay) {
+            licensesOverlay.classList.remove('hidden');
+            // 🌐 INJECT AS HTML SO THE GITHUB URL BECOMES A CLICKABLE LINK
+            if (licensesTextContainer) {
+                licensesTextContainer.innerHTML = THIRD_PARTY_LICENSES_TEXT;
             }
         }
     });
